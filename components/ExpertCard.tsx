@@ -43,14 +43,14 @@ export default function ExpertCard({ expert }: { expert: Expert }) {
         ))}
       </div>
 
-      <div className="flex flex-col gap-1.5 rounded-lg bg-zinc-50 p-3 text-sm dark:bg-zinc-900">
+      <div className="flex flex-col gap-3 rounded-lg bg-zinc-50 p-3 text-sm dark:bg-zinc-900">
         <div className="flex justify-between gap-2 text-zinc-600 dark:text-zinc-300">
           <span className="text-zinc-400 dark:text-zinc-500">사무실 위치</span>
           <span>{expert.officeLocation}</span>
         </div>
-        <div className="flex justify-between gap-2 text-zinc-600 dark:text-zinc-300">
-          <span className="shrink-0 text-zinc-400 dark:text-zinc-500">용역비용</span>
-          <span className="text-right">{expert.feeDescription}</span>
+        <div className="flex flex-col gap-0.5 text-zinc-600 dark:text-zinc-300">
+          <span className="text-zinc-400 dark:text-zinc-500">용역비용</span>
+          <span>{expert.feeDescription}</span>
         </div>
       </div>
 
