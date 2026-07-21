@@ -7,5 +7,9 @@ import ValuationWizard from "@/components/ValuationWizard";
 export default function UnstockApp() {
   const [started, setStarted] = useState(false);
 
-  return started ? <ValuationWizard /> : <LandingScreen onStart={() => setStarted(true)} />;
+  return started ? (
+    <ValuationWizard onExitToLanding={() => setStarted(false)} />
+  ) : (
+    <LandingScreen onStart={() => setStarted(true)} />
+  );
 }
