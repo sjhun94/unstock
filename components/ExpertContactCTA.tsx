@@ -1,10 +1,6 @@
-// TODO: 실제 연락처가 정해지면 아래 플레이스홀더를 교체하세요.
-const CONTACT_EMAIL = "contact@unstock.example";
+import Link from "next/link";
 
 export default function ExpertContactCTA() {
-  const subject = encodeURIComponent("Unstock 비상장주식 평가 상담 요청");
-  const mailtoHref = `mailto:${CONTACT_EMAIL}?subject=${subject}`;
-
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-5 dark:border-zinc-800 dark:bg-zinc-900">
       <div>
@@ -16,9 +12,9 @@ export default function ExpertContactCTA() {
           상담해 정확한 평가를 받아보세요.
         </p>
       </div>
-      <a href={mailtoHref} className="btn-secondary self-start">
+      <Link href="/experts" className="btn-secondary self-start">
         전문가에게 상담 요청하기
-      </a>
+      </Link>
     </div>
   );
 }
