@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { calculateValuation, type ValuationInput } from "@/lib/valuation";
 import ExpertContactCTA from "@/components/ExpertContactCTA";
+import NetProfitUpload from "@/components/NetProfitUpload";
 
 const STEPS = ["로직 설명", "기본정보", "순자산가치", "순손익가치", "기타사항", "결과"] as const;
 
@@ -262,8 +263,13 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
       {step === 3 && (
         <StepSection
           title="순손익가치"
-          description="최근 3개 사업연도의 순손익액(세무조정 후 총액)을 입력하세요."
+          description="최근 3개 사업연도의 순손익액(세무조정 후 총액)을 입력하세요. 재무상태표·세무조정계산서가 있다면 AI가 자동으로 계산해드려요."
         >
+          <p className="rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+            AI 자동계산은 실험적 기능이에요. 핵심 항목(각사업연도소득, 법인세 등)만 반영하며 기부금·이월결손금 등
+            세부 조정은 정확하지 않을 수 있어요. 계산된 값은 반드시 확인 후 필요하면 직접 수정하세요.
+          </p>
+
           <Field label="최근 사업연도 (1년 전) 순손익액">
             <input
               type="number"
@@ -274,6 +280,8 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
               className="input"
             />
           </Field>
+          <NetProfitUpload yearLabel="1년 전" onResult={(value) => update("profitYear1", String(value))} />
+
           <Field label="2년 전 순손익액">
             <input
               type="number"
@@ -284,6 +292,8 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
               className="input"
             />
           </Field>
+          <NetProfitUpload yearLabel="2년 전" onResult={(value) => update("profitYear2", String(value))} />
+
           <Field label="3년 전 순손익액">
             <input
               type="number"
@@ -294,6 +304,8 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
               className="input"
             />
           </Field>
+          <NetProfitUpload yearLabel="3년 전" onResult={(value) => update("profitYear3", String(value))} />
+
           <Field label="순손익가치환원율 (%)" required>
             <input
               type="number"
