@@ -1,4 +1,4 @@
-import ValuationWizard from "@/components/ValuationWizard";
+import UnstockApp from "@/components/UnstockApp";
 
 export default function Home() {
   return (
@@ -9,7 +9,7 @@ export default function Home() {
           비상장주식 세법상 가치평가 계산기
         </p>
       </div>
-      <ValuationWizard />
+      <UnstockApp />
     </div>
   );
 }
