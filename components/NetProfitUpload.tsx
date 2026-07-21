@@ -9,6 +9,18 @@ interface Props {
 
 type Status = "idle" | "loading" | "done" | "error";
 
+const ALLOWED_MIME_TYPES = new Set([
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+  "image/heic",
+  "image/heif",
+]);
+
+const UNSUPPORTED_FILE_MESSAGE = "PDF 또는 이미지 파일만 올릴 수 있어요. 엑셀·워드 파일은 PDF로 변환해서 올려주세요.";
+
 function FileUploadField({
   label,
   file,
@@ -19,6 +31,17 @@ function FileUploadField({
   onChange: (file: File | null) => void;
 }) {
   const inputId = useId();
+  const [fileError, setFileError] = useState("");
+
+  function handleFileSelect(selected: File | null) {
+    if (selected && !ALLOWED_MIME_TYPES.has(selected.type)) {
+      setFileError(UNSUPPORTED_FILE_MESSAGE);
+      onChange(null);
+      return;
+    }
+    setFileError("");
+    onChange(selected);
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-1">
@@ -34,13 +57,14 @@ function FileUploadField({
           id={inputId}
           type="file"
           accept="application/pdf,image/*"
-          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+          onChange={(e) => handleFileSelect(e.target.files?.[0] ?? null)}
           className="sr-only"
         />
         <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">
           {file ? file.name : "선택된 파일 없음"}
         </span>
       </div>
+      {fileError && <p className="text-xs text-red-600 dark:text-red-400">{fileError}</p>}
     </div>
   );
 }
