@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 
 interface Props {
   yearLabel: string;
@@ -8,6 +8,42 @@ interface Props {
 }
 
 type Status = "idle" | "loading" | "done" | "error";
+
+function FileUploadField({
+  label,
+  file,
+  onChange,
+}: {
+  label: string;
+  file: File | null;
+  onChange: (file: File | null) => void;
+}) {
+  const inputId = useId();
+
+  return (
+    <div className="flex flex-1 flex-col gap-1">
+      <span className="text-xs text-zinc-600 dark:text-zinc-300">{label}</span>
+      <div className="flex items-center gap-2">
+        <label
+          htmlFor={inputId}
+          className="cursor-pointer rounded-md border border-zinc-300 bg-white px-2.5 py-1 text-xs font-medium text-zinc-700 transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200 dark:hover:bg-zinc-800"
+        >
+          파일 업로드하기
+        </label>
+        <input
+          id={inputId}
+          type="file"
+          accept="application/pdf,image/*"
+          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+          className="sr-only"
+        />
+        <span className="truncate text-xs text-zinc-500 dark:text-zinc-400">
+          {file ? file.name : "선택된 파일 없음"}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export default function NetProfitUpload({ yearLabel, onResult }: Props) {
   const [balanceSheet, setBalanceSheet] = useState<File | null>(null);
@@ -44,25 +80,9 @@ export default function NetProfitUpload({ yearLabel, onResult }: Props) {
       <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
         {yearLabel} 문서로 AI 자동 계산 (선택)
       </p>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <label className="flex-1 text-xs text-zinc-600 dark:text-zinc-300">
-          재무상태표
-          <input
-            type="file"
-            accept="application/pdf,image/*"
-            onChange={(e) => setBalanceSheet(e.target.files?.[0] ?? null)}
-            className="mt-1 block w-full text-xs"
-          />
-        </label>
-        <label className="flex-1 text-xs text-zinc-600 dark:text-zinc-300">
-          세무조정계산서
-          <input
-            type="file"
-            accept="application/pdf,image/*"
-            onChange={(e) => setTaxAdjustment(e.target.files?.[0] ?? null)}
-            className="mt-1 block w-full text-xs"
-          />
-        </label>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <FileUploadField label="재무상태표" file={balanceSheet} onChange={setBalanceSheet} />
+        <FileUploadField label="세무조정계산서" file={taxAdjustment} onChange={setTaxAdjustment} />
       </div>
       <button
         type="button"
@@ -70,7 +90,7 @@ export default function NetProfitUpload({ yearLabel, onResult }: Props) {
         disabled={!balanceSheet || !taxAdjustment || status === "loading"}
         className="btn-secondary self-start text-xs disabled:opacity-40"
       >
-        {status === "loading" ? "분석 중..." : "AI로 순손익액 계산하기"}
+        {status === "loading" ? "[업로드중]" : "AI로 순손익액 계산하기"}
       </button>
       {status === "done" && (
         <p className="text-xs text-emerald-700 dark:text-emerald-400">
