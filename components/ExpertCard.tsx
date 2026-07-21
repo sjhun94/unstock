@@ -1,17 +1,25 @@
 import type { Expert } from "@/lib/experts";
+import CopyableContact from "@/components/CopyableContact";
 
 export default function ExpertCard({ expert }: { expert: Expert }) {
-  const subject = encodeURIComponent("Unstock 비상장주식 평가 상담 요청");
-
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-black/10 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-zinc-950">
       <div className="flex items-center gap-4">
-        <div
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
-          style={{ backgroundColor: expert.avatarColor }}
-        >
-          {expert.initials}
-        </div>
+        {expert.photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={expert.photoUrl}
+            alt={expert.name}
+            className="h-14 w-14 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <div
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-white"
+            style={{ backgroundColor: expert.avatarColor }}
+          >
+            {expert.initials}
+          </div>
+        )}
         <div>
           <p className="font-semibold text-zinc-900 dark:text-zinc-50">
             {expert.name} <span className="font-normal text-zinc-500 dark:text-zinc-400">· {expert.role}</span>
@@ -35,14 +43,21 @@ export default function ExpertCard({ expert }: { expert: Expert }) {
         ))}
       </div>
 
-      <div className="flex flex-col gap-1 text-sm text-zinc-500 dark:text-zinc-400">
-        <span>{expert.phone}</span>
-        <span>{expert.email}</span>
+      <div className="flex flex-col gap-1.5 rounded-lg bg-zinc-50 p-3 text-sm dark:bg-zinc-900">
+        <div className="flex justify-between gap-2 text-zinc-600 dark:text-zinc-300">
+          <span className="text-zinc-400 dark:text-zinc-500">사무실 위치</span>
+          <span>{expert.officeLocation}</span>
+        </div>
+        <div className="flex justify-between gap-2 text-zinc-600 dark:text-zinc-300">
+          <span className="shrink-0 text-zinc-400 dark:text-zinc-500">용역비용</span>
+          <span className="text-right">{expert.feeDescription}</span>
+        </div>
       </div>
 
-      <a href={`mailto:${expert.email}?subject=${subject}`} className="btn-primary text-center">
-        상담 요청하기
-      </a>
+      <div className="flex flex-col gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
+        <CopyableContact label="전화" value={expert.phone} />
+        <CopyableContact label="이메일" value={expert.email} />
+      </div>
     </div>
   );
 }
