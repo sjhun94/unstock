@@ -263,7 +263,7 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
       {step === 3 && (
         <StepSection
           title="순손익가치"
-          description="최근 3개 사업연도의 순손익액(세무조정 후 총액)을 입력하세요. 재무상태표·세무조정계산서가 있다면 AI가 자동으로 계산해드려요."
+          description="최근 3개 사업연도의 순손익액(세무조정 후 총액)을 입력하세요. 손익계산서·세무조정계산서가 있다면 AI가 자동으로 계산해드려요."
         >
           <p className="rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-800 dark:bg-amber-950 dark:text-amber-300">
             AI 자동계산은 실험적 기능이에요. 핵심 항목(각사업연도소득, 법인세 등)만 반영하며 기부금·이월결손금 등

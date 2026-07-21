@@ -46,19 +46,19 @@ function FileUploadField({
 }
 
 export default function NetProfitUpload({ yearLabel, onResult }: Props) {
-  const [balanceSheet, setBalanceSheet] = useState<File | null>(null);
+  const [incomeStatement, setIncomeStatement] = useState<File | null>(null);
   const [taxAdjustment, setTaxAdjustment] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState("");
   const [notes, setNotes] = useState("");
 
   async function handleAnalyze() {
-    if (!balanceSheet || !taxAdjustment) return;
+    if (!incomeStatement || !taxAdjustment) return;
     setStatus("loading");
     setErrorMessage("");
 
     const formData = new FormData();
-    formData.append("balanceSheet", balanceSheet);
+    formData.append("incomeStatement", incomeStatement);
     formData.append("taxAdjustment", taxAdjustment);
 
     try {
@@ -81,13 +81,13 @@ export default function NetProfitUpload({ yearLabel, onResult }: Props) {
         {yearLabel} 문서로 AI 자동 계산 (선택)
       </p>
       <div className="flex flex-col gap-3 sm:flex-row">
-        <FileUploadField label="재무상태표" file={balanceSheet} onChange={setBalanceSheet} />
+        <FileUploadField label="손익계산서" file={incomeStatement} onChange={setIncomeStatement} />
         <FileUploadField label="세무조정계산서" file={taxAdjustment} onChange={setTaxAdjustment} />
       </div>
       <button
         type="button"
         onClick={handleAnalyze}
-        disabled={!balanceSheet || !taxAdjustment || status === "loading"}
+        disabled={!incomeStatement || !taxAdjustment || status === "loading"}
         className="btn-secondary self-start text-xs disabled:opacity-40"
       >
         {status === "loading" ? "[업로드중]" : "AI로 순손익액 계산하기"}

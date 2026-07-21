@@ -30,7 +30,7 @@ const RESPONSE_SCHEMA = {
   required: ["taxableIncome", "addBackAmount", "deductAmount", "netProfitLoss", "notes"],
 } as const;
 
-const PROMPT = `당신은 한국 세무 전문가입니다. 첨부된 두 문서(재무상태표, 세무조정계산서)를 분석해서
+const PROMPT = `당신은 한국 세무 전문가입니다. 첨부된 두 문서(손익계산서, 세무조정계산서)를 분석해서
 상속세 및 증여세법 시행령 제56조에 따른 "1주당 순손익액" 계산에 필요한 해당 사업연도의
 순손익액을 계산하세요.
 
@@ -51,7 +51,7 @@ const PROMPT = `당신은 한국 세무 전문가입니다. 첨부된 두 문서
 반드시 JSON으로만 응답하세요.`;
 
 export async function analyzeNetProfitDocuments(
-  balanceSheet: UploadedFile,
+  incomeStatement: UploadedFile,
   taxAdjustment: UploadedFile,
 ): Promise<NetProfitAnalysis> {
   const result = await ai.models.generateContent({
@@ -61,8 +61,8 @@ export async function analyzeNetProfitDocuments(
         role: "user",
         parts: [
           { text: PROMPT },
-          { text: "\n\n[재무상태표]" },
-          { inlineData: { data: balanceSheet.data.toString("base64"), mimeType: balanceSheet.mimeType } },
+          { text: "\n\n[손익계산서]" },
+          { inlineData: { data: incomeStatement.data.toString("base64"), mimeType: incomeStatement.mimeType } },
           { text: "\n\n[세무조정계산서]" },
           { inlineData: { data: taxAdjustment.data.toString("base64"), mimeType: taxAdjustment.mimeType } },
         ],

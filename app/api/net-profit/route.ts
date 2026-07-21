@@ -9,19 +9,19 @@ async function fileToBuffer(file: File) {
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
-  const balanceSheetFile = formData.get("balanceSheet");
+  const incomeStatementFile = formData.get("incomeStatement");
   const taxAdjustmentFile = formData.get("taxAdjustment");
 
-  if (!(balanceSheetFile instanceof File) || !(taxAdjustmentFile instanceof File)) {
+  if (!(incomeStatementFile instanceof File) || !(taxAdjustmentFile instanceof File)) {
     return NextResponse.json(
-      { error: "재무상태표와 세무조정계산서 파일을 모두 첨부해주세요." },
+      { error: "손익계산서와 세무조정계산서 파일을 모두 첨부해주세요." },
       { status: 400 },
     );
   }
 
   try {
     const analysis = await analyzeNetProfitDocuments(
-      { data: await fileToBuffer(balanceSheetFile), mimeType: balanceSheetFile.type || "application/pdf" },
+      { data: await fileToBuffer(incomeStatementFile), mimeType: incomeStatementFile.type || "application/pdf" },
       { data: await fileToBuffer(taxAdjustmentFile), mimeType: taxAdjustmentFile.type || "application/pdf" },
     );
     return NextResponse.json(analysis);
