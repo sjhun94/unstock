@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { calculateValuation, type ValuationInput } from "@/lib/valuation";
+import ExpertContactCTA from "@/components/ExpertContactCTA";
 
 const STEPS = ["기본 정보", "순손익가치", "순자산가치", "결과"] as const;
 
@@ -229,6 +230,7 @@ export default function ValuationWizard() {
             수치이며, 세무조정·최근 3년 이내 설립법인·결손법인 등 세부 요건은 반영하지 않았습니다. 실제
             신고·의사결정 전에는 반드시 세무 전문가의 검토를 받으시기 바랍니다.
           </p>
+          <ExpertContactCTA />
         </StepSection>
       )}
 
