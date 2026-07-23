@@ -15,8 +15,13 @@ const initialForm = {
   businessStartDate: "",
   valuationDate: "",
   financialStatementDate: "",
+  netAssetInputMode: "adjusted" as "adjusted" | "bookPlusReserve",
   totalAssets: "",
   totalLiabilities: "",
+  bookAssets: "",
+  bookLiabilities: "",
+  reserveAddition: "0",
+  reserveSubtraction: "0",
   goodwill: "0",
   isRealEstateHeavy: false,
   profitYear1: "",
@@ -57,7 +62,9 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
       return toNumber(form.totalShares) > 0 && form.businessStartDate !== "" && form.valuationDate !== "";
     }
     if (step === 2) {
-      return form.totalAssets !== "" && form.totalLiabilities !== "";
+      return form.netAssetInputMode === "adjusted"
+        ? form.totalAssets !== "" && form.totalLiabilities !== ""
+        : form.bookAssets !== "" && form.bookLiabilities !== "";
     }
     if (step === 3) {
       return form.capitalizationRatePercent !== "" && toNumber(form.capitalizationRatePercent) > 0;
@@ -83,10 +90,17 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
     setStep(0);
   }
 
+  const taxAdjustedAssets =
+    form.netAssetInputMode === "adjusted"
+      ? toNumber(form.totalAssets)
+      : toNumber(form.bookAssets) + toNumber(form.reserveAddition) - toNumber(form.reserveSubtraction);
+  const taxAdjustedLiabilities =
+    form.netAssetInputMode === "adjusted" ? toNumber(form.totalLiabilities) : toNumber(form.bookLiabilities);
+
   const input: ValuationInput = {
     totalShares: toNumber(form.totalShares),
-    totalAssets: toNumber(form.totalAssets),
-    totalLiabilities: toNumber(form.totalLiabilities),
+    totalAssets: taxAdjustedAssets,
+    totalLiabilities: taxAdjustedLiabilities,
     goodwill: toNumber(form.goodwill),
     isRealEstateHeavy: form.isRealEstateHeavy,
     profitYear1: toNumber(form.profitYear1),
@@ -214,27 +228,116 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
       )}
 
       {step === 2 && (
-        <StepSection title="순자산가치" description="평가기준일 현재 자산·부채 총액을 입력하세요.">
-          <Field label="자산총액" required>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={form.totalAssets}
-              onChange={(e) => update("totalAssets", e.target.value)}
-              placeholder="예: 1500000000"
-              className="input"
-            />
-          </Field>
-          <Field label="부채총액" required>
-            <input
-              type="number"
-              inputMode="numeric"
-              value={form.totalLiabilities}
-              onChange={(e) => update("totalLiabilities", e.target.value)}
-              placeholder="예: 500000000"
-              className="input"
-            />
-          </Field>
+        <StepSection title="순자산가치" description="평가기준일 현재 세법상 자산·부채 총액을 입력하세요.">
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              자산·부채 금액을 어떻게 입력하시겠어요?
+            </span>
+            <label className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <input
+                type="radio"
+                name="netAssetInputMode"
+                checked={form.netAssetInputMode === "adjusted"}
+                onChange={() => update("netAssetInputMode", "adjusted")}
+                className="mt-1 h-4 w-4"
+              />
+              <span>
+                세무조정이 이미 반영된 <b>세법상 자산·부채금액</b>을 알고 있어요
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+              <input
+                type="radio"
+                name="netAssetInputMode"
+                checked={form.netAssetInputMode === "bookPlusReserve"}
+                onChange={() => update("netAssetInputMode", "bookPlusReserve")}
+                className="mt-1 h-4 w-4"
+              />
+              <span>
+                <b>재무상태표상 자산·부채</b>와 <b>유보·△유보</b>로 직접 계산할게요
+              </span>
+            </label>
+          </div>
+
+          {form.netAssetInputMode === "adjusted" ? (
+            <>
+              <Field label="세법상 자산총액" required>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={form.totalAssets}
+                  onChange={(e) => update("totalAssets", e.target.value)}
+                  placeholder="예: 1500000000"
+                  className="input"
+                />
+              </Field>
+              <Field label="세법상 부채총액" required>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={form.totalLiabilities}
+                  onChange={(e) => update("totalLiabilities", e.target.value)}
+                  placeholder="예: 500000000"
+                  className="input"
+                />
+              </Field>
+            </>
+          ) : (
+            <>
+              <Field label="재무상태표상 자산총액" required>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={form.bookAssets}
+                  onChange={(e) => update("bookAssets", e.target.value)}
+                  placeholder="예: 1450000000"
+                  className="input"
+                />
+              </Field>
+              <Field label="재무상태표상 부채총액" required>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={form.bookLiabilities}
+                  onChange={(e) => update("bookLiabilities", e.target.value)}
+                  placeholder="예: 500000000"
+                  className="input"
+                />
+              </Field>
+              <Field label="유보 합계 (선택)">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={form.reserveAddition}
+                  onChange={(e) => update("reserveAddition", e.target.value)}
+                  placeholder="0"
+                  className="input"
+                />
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  자본금과 적립금조정명세서(을)상 유보 잔액 합계. 자산총액에 더해집니다.
+                </p>
+              </Field>
+              <Field label="△유보(부인유보) 합계 (선택)">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={form.reserveSubtraction}
+                  onChange={(e) => update("reserveSubtraction", e.target.value)}
+                  placeholder="0"
+                  className="input"
+                />
+                <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  △유보(부인유보) 잔액 합계. 자산총액에서 차감됩니다.
+                </p>
+              </Field>
+              <p className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+                계산된 세법상 자산총액: <b>{formatWon(taxAdjustedAssets)}</b>
+                <br />
+                (재무상태표상 자산총액 + 유보 − △유보)
+              </p>
+            </>
+          )}
+
           <Field label="영업권 상당액 (선택)">
             <input
               type="number"
