@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { analyzeNetProfitDocuments } from "@/lib/gemini";
+import { analyzeNetAssetDocuments } from "@/lib/gemini";
 
 export const maxDuration = 60;
 
@@ -23,24 +23,24 @@ async function fileToBuffer(file: File) {
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
-  const incomeStatementFile = formData.get("incomeStatement");
-  const taxAdjustmentFile = formData.get("taxAdjustment");
+  const balanceSheetFile = formData.get("balanceSheet");
+  const reserveScheduleFile = formData.get("reserveSchedule");
 
-  if (!(incomeStatementFile instanceof File) || !(taxAdjustmentFile instanceof File)) {
+  if (!(balanceSheetFile instanceof File) || !(reserveScheduleFile instanceof File)) {
     return NextResponse.json(
-      { error: "손익계산서와 세무조정계산서 파일을 모두 첨부해주세요." },
+      { error: "재무상태표와 자본금과 적립금조정명세서(을) 파일을 모두 첨부해주세요." },
       { status: 400 },
     );
   }
 
-  if (!ALLOWED_MIME_TYPES.has(incomeStatementFile.type) || !ALLOWED_MIME_TYPES.has(taxAdjustmentFile.type)) {
+  if (!ALLOWED_MIME_TYPES.has(balanceSheetFile.type) || !ALLOWED_MIME_TYPES.has(reserveScheduleFile.type)) {
     return NextResponse.json({ error: UNSUPPORTED_FILE_MESSAGE }, { status: 400 });
   }
 
   try {
-    const analysis = await analyzeNetProfitDocuments(
-      { data: await fileToBuffer(incomeStatementFile), mimeType: incomeStatementFile.type },
-      { data: await fileToBuffer(taxAdjustmentFile), mimeType: taxAdjustmentFile.type },
+    const analysis = await analyzeNetAssetDocuments(
+      { data: await fileToBuffer(balanceSheetFile), mimeType: balanceSheetFile.type },
+      { data: await fileToBuffer(reserveScheduleFile), mimeType: reserveScheduleFile.type },
     );
     return NextResponse.json(analysis);
   } catch (error) {

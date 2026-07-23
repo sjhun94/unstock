@@ -50,40 +50,128 @@ const PROMPT = `당신은 한국 세무 전문가입니다. 첨부된 두 문서
 
 반드시 JSON으로만 응답하세요.`;
 
-export async function analyzeNetProfitDocuments(
-  incomeStatement: UploadedFile,
-  taxAdjustment: UploadedFile,
-): Promise<NetProfitAnalysis> {
-  const result = await ai.models.generateContent({
-    model: GENERATION_MODEL,
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: PROMPT },
-          { text: "\n\n[손익계산서]" },
-          { inlineData: { data: incomeStatement.data.toString("base64"), mimeType: incomeStatement.mimeType } },
-          { text: "\n\n[세무조정계산서]" },
-          { inlineData: { data: taxAdjustment.data.toString("base64"), mimeType: taxAdjustment.mimeType } },
-        ],
-      },
-    ],
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: RESPONSE_SCHEMA,
-    },
-  });
+type GeminiPart = { text: string } | { inlineData: { data: string; mimeType: string } };
+
+// Gemini SDK가 던지는 에러는 종종 날것의 JSON 문자열이라, 화면에 그대로 노출하지 않고
+// 사람이 읽을 수 있는 한국어 메시지로 바꿔서 던집니다.
+function toFriendlyError(error: unknown): Error {
+  const rawMessage = error instanceof Error ? error.message : String(error);
+
+  if (rawMessage.includes("Unsupported MIME type")) {
+    return new Error(
+      "지원하지 않는 파일 형식이에요. PDF 또는 이미지(사진, 스캔본) 파일만 업로드할 수 있어요.",
+    );
+  }
+  if (rawMessage.includes("UNAVAILABLE") || rawMessage.includes("high demand") || rawMessage.includes("503")) {
+    return new Error("AI 서버가 일시적으로 혼잡해요. 잠시 후 다시 시도해주세요.");
+  }
+  if (rawMessage.includes("RESOURCE_EXHAUSTED") || rawMessage.includes("429")) {
+    return new Error("요청이 너무 많아 잠시 제한됐어요. 잠시 후 다시 시도해주세요.");
+  }
+  return new Error("문서 분석 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+}
+
+async function callGemini<T>(
+  prompt: string,
+  labeledFiles: { label: string; file: UploadedFile }[],
+  responseSchema: object,
+): Promise<T> {
+  const parts: GeminiPart[] = [{ text: prompt }];
+  for (const { label, file } of labeledFiles) {
+    parts.push({ text: `\n\n[${label}]` });
+    parts.push({ inlineData: { data: file.data.toString("base64"), mimeType: file.mimeType } });
+  }
+
+  let result;
+  try {
+    result = await ai.models.generateContent({
+      model: GENERATION_MODEL,
+      contents: [{ role: "user", parts }],
+      config: { responseMimeType: "application/json", responseSchema },
+    });
+  } catch (error) {
+    throw toFriendlyError(error);
+  }
 
   if (!result.text) {
     throw new Error("문서 분석 실패: Gemini API 응답이 비어 있습니다.");
   }
 
-  let parsed: NetProfitAnalysis;
   try {
-    parsed = JSON.parse(result.text);
+    return JSON.parse(result.text) as T;
   } catch {
     throw new Error("문서 분석 실패: 응답을 해석할 수 없습니다.");
   }
+}
 
-  return parsed;
+export async function analyzeNetProfitDocuments(
+  incomeStatement: UploadedFile,
+  taxAdjustment: UploadedFile,
+): Promise<NetProfitAnalysis> {
+  return callGemini<NetProfitAnalysis>(
+    PROMPT,
+    [
+      { label: "손익계산서", file: incomeStatement },
+      { label: "세무조정계산서", file: taxAdjustment },
+    ],
+    RESPONSE_SCHEMA,
+  );
+}
+
+export interface NetAssetAnalysis {
+  bookAssets: number; // 재무상태표상 자산총계
+  bookLiabilities: number; // 재무상태표상 부채총계
+  reserveAddition: number; // 유보 합계 (자본금과 적립금조정명세서(을))
+  reserveSubtraction: number; // △유보(부인유보) 합계
+  taxAdjustedAssets: number; // 세법상 자산총액 = bookAssets + reserveAddition - reserveSubtraction
+  notes: string;
+}
+
+const NET_ASSET_RESPONSE_SCHEMA = {
+  type: "object",
+  properties: {
+    bookAssets: { type: "number" },
+    bookLiabilities: { type: "number" },
+    reserveAddition: { type: "number" },
+    reserveSubtraction: { type: "number" },
+    taxAdjustedAssets: { type: "number" },
+    notes: { type: "string" },
+  },
+  required: [
+    "bookAssets",
+    "bookLiabilities",
+    "reserveAddition",
+    "reserveSubtraction",
+    "taxAdjustedAssets",
+    "notes",
+  ],
+} as const;
+
+const NET_ASSET_PROMPT = `당신은 한국 세무 전문가입니다. 첨부된 두 문서(재무상태표, 자본금과 적립금조정명세서(을))를
+분석해서 상속세 및 증여세법 시행령 제55조에 따른 "세법상 자산총액"을 계산하세요.
+
+계산 방법:
+1. 재무상태표에서 "자산총계"를 찾아 bookAssets로, "부채총계"를 찾아 bookLiabilities로 기록하세요.
+2. 자본금과 적립금조정명세서(을)에서 유보(익금산입·손금불산입으로 세무상 자산가치를 증가시키는
+   항목) 잔액의 합계를 reserveAddition으로 기록하세요.
+3. 같은 명세서에서 △유보(부인유보, 손금산입·익금불산입으로 세무상 자산가치를 감소시키는 항목)
+   잔액의 합계를 reserveSubtraction으로 기록하세요 (양수로 기록).
+4. taxAdjustedAssets = bookAssets + reserveAddition - reserveSubtraction 으로 계산하세요.
+5. 문서에서 특정 항목을 찾지 못했다면 0으로 처리하고, 판단이 불확실한 항목이 있다면 notes에
+   구체적으로 적어주세요.
+
+반드시 JSON으로만 응답하세요.`;
+
+export async function analyzeNetAssetDocuments(
+  balanceSheet: UploadedFile,
+  reserveSchedule: UploadedFile,
+): Promise<NetAssetAnalysis> {
+  return callGemini<NetAssetAnalysis>(
+    NET_ASSET_PROMPT,
+    [
+      { label: "재무상태표", file: balanceSheet },
+      { label: "자본금과 적립금조정명세서(을)", file: reserveSchedule },
+    ],
+    NET_ASSET_RESPONSE_SCHEMA,
+  );
 }

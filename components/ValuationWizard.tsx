@@ -4,6 +4,7 @@ import { useState } from "react";
 import { calculateValuation, type ValuationInput } from "@/lib/valuation";
 import ExpertContactCTA from "@/components/ExpertContactCTA";
 import NetProfitUpload from "@/components/NetProfitUpload";
+import NetAssetUpload, { type NetAssetResult } from "@/components/NetAssetUpload";
 
 const STEPS = ["로직 설명", "기본정보", "순자산가치", "순손익가치", "기타사항", "결과"] as const;
 
@@ -88,6 +89,16 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
   function reset() {
     setForm(initialForm);
     setStep(0);
+  }
+
+  function handleNetAssetResult(result: NetAssetResult) {
+    setForm((prev) => ({
+      ...prev,
+      bookAssets: String(result.bookAssets),
+      bookLiabilities: String(result.bookLiabilities),
+      reserveAddition: String(result.reserveAddition),
+      reserveSubtraction: String(result.reserveSubtraction),
+    }));
   }
 
   const taxAdjustedAssets =
@@ -284,6 +295,12 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
             </>
           ) : (
             <>
+              <p className="rounded-lg bg-amber-50 p-3 text-xs leading-relaxed text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                AI 자동계산은 실험적 기능이에요. 문서에서 확인되는 유보·△유보 항목만 반영하므로, 계산된 값은
+                반드시 확인 후 필요하면 직접 수정하세요.
+              </p>
+              <NetAssetUpload onResult={handleNetAssetResult} />
+
               <Field label="재무상태표상 자산총액" required>
                 <input
                   type="number"
