@@ -48,6 +48,15 @@ function toNumber(value: string) {
   return Number.isFinite(n) ? n : 0;
 }
 
+// 입력값을 숫자만 남긴 뒤 YYYY-MM-DD 형태로 자동 하이픈을 넣어줍니다.
+// 네이티브 <input type="date">가 브라우저/OS 로케일에 따라 형식이 제각각으로 보이는 문제를 피하기 위해 직접 구현합니다.
+function formatDateInput(raw: string) {
+  const digits = raw.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+}
+
 export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?: () => void }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<FormState>(initialForm);
@@ -213,25 +222,34 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
           </Field>
           <Field label="사업개시일" required>
             <input
-              type="date"
+              type="text"
+              inputMode="numeric"
               value={form.businessStartDate}
-              onChange={(e) => update("businessStartDate", e.target.value)}
+              onChange={(e) => update("businessStartDate", formatDateInput(e.target.value))}
+              placeholder="YYYY-MM-DD"
+              maxLength={10}
               className="input"
             />
           </Field>
           <Field label="평가기준일" required>
             <input
-              type="date"
+              type="text"
+              inputMode="numeric"
               value={form.valuationDate}
-              onChange={(e) => update("valuationDate", e.target.value)}
+              onChange={(e) => update("valuationDate", formatDateInput(e.target.value))}
+              placeholder="YYYY-MM-DD"
+              maxLength={10}
               className="input"
             />
           </Field>
           <Field label="재무제표기준일 (선택)">
             <input
-              type="date"
+              type="text"
+              inputMode="numeric"
               value={form.financialStatementDate}
-              onChange={(e) => update("financialStatementDate", e.target.value)}
+              onChange={(e) => update("financialStatementDate", formatDateInput(e.target.value))}
+              placeholder="YYYY-MM-DD"
+              maxLength={10}
               className="input"
             />
           </Field>
