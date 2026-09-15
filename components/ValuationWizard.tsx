@@ -137,9 +137,10 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
     isResultStep && input.totalShares > 0 && input.capitalizationRate > 0 ? calculateValuation(input) : null;
 
   return (
-    <div className="flex w-full max-w-xl flex-col gap-8 rounded-2xl border border-black/10 bg-white p-8 shadow-sm dark:border-white/10 dark:bg-zinc-950">
-      <ProgressBar step={step} />
+    <div className="flex w-full max-w-4xl flex-col gap-8 sm:flex-row">
+      <Timeline step={step} />
 
+      <div className="flex flex-1 flex-col gap-8 rounded-2xl border border-black/10 bg-white p-8 shadow-sm dark:border-white/10 dark:bg-zinc-950">
       {step === 0 && (
         <StepSection
           title="세법상 비상장주식 평가, 이렇게 계산돼요"
@@ -570,27 +571,58 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
           </button>
         )}
       </div>
+      </div>
     </div>
   );
 }
 
-function ProgressBar({ step }: { step: number }) {
+function Timeline({ step }: { step: number }) {
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex justify-between text-xs font-medium text-zinc-500 dark:text-zinc-400">
-        {STEPS.map((label, i) => (
-          <span key={label} className={i === step ? "text-zinc-900 dark:text-zinc-50" : ""}>
-            {label}
-          </span>
-        ))}
-      </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-zinc-800">
-        <div
-          className="h-full rounded-full bg-zinc-900 transition-all dark:bg-zinc-50"
-          style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
-        />
-      </div>
-    </div>
+    <ol className="flex shrink-0 gap-4 overflow-x-auto sm:w-48 sm:flex-col sm:gap-0 sm:overflow-visible">
+      {STEPS.map((label, i) => {
+        const isDone = i < step;
+        const isCurrent = i === step;
+        const isLast = i === STEPS.length - 1;
+        return (
+          <li key={label} className="flex shrink-0 items-center gap-3 sm:items-stretch">
+            <div className="flex flex-col items-center">
+              <span
+                className={
+                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold " +
+                  (isDone
+                    ? "bg-zinc-900 text-white dark:bg-zinc-50 dark:text-zinc-900"
+                    : isCurrent
+                      ? "border-2 border-zinc-900 text-zinc-900 dark:border-zinc-50 dark:text-zinc-50"
+                      : "border border-zinc-300 text-zinc-400 dark:border-zinc-700 dark:text-zinc-600")
+                }
+              >
+                {isDone ? "✓" : i + 1}
+              </span>
+              {!isLast && (
+                <span
+                  className={
+                    "mt-1 hidden w-px flex-1 sm:block " +
+                    (isDone ? "bg-zinc-900 dark:bg-zinc-50" : "bg-zinc-200 dark:bg-zinc-800")
+                  }
+                />
+              )}
+            </div>
+            <span
+              className={
+                "text-sm sm:pb-8 " +
+                (isCurrent
+                  ? "font-semibold text-zinc-900 dark:text-zinc-50"
+                  : isDone
+                    ? "text-zinc-600 dark:text-zinc-400"
+                    : "text-zinc-400 dark:text-zinc-600")
+              }
+            >
+              {label}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
