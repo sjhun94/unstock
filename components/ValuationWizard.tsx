@@ -12,7 +12,6 @@ const initialForm = {
   companyName: "",
   parValue: "",
   totalShares: "",
-  capitalStock: "",
   businessStartDate: "",
   valuationDate: "",
   financialStatementDate: "",
@@ -23,7 +22,7 @@ const initialForm = {
   bookLiabilities: "",
   reserveAddition: "0",
   reserveSubtraction: "0",
-  goodwill: "0",
+  purchasedGoodwillDeduction: "0",
   isRealEstateHeavy: false,
   profitYear1: "",
   profitYear2: "",
@@ -121,7 +120,7 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
     totalShares: toNumber(form.totalShares),
     totalAssets: taxAdjustedAssets,
     totalLiabilities: taxAdjustedLiabilities,
-    goodwill: toNumber(form.goodwill),
+    purchasedGoodwillDeduction: toNumber(form.purchasedGoodwillDeduction),
     isRealEstateHeavy: form.isRealEstateHeavy,
     profitYear1: toNumber(form.profitYear1),
     profitYear2: toNumber(form.profitYear2),
@@ -210,15 +209,11 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
               발행한 주식수가 없다면 1로 입력해 주세요.
             </p>
           </Field>
-          <Field label="자본금 (선택)">
-            <input
-              type="number"
-              inputMode="numeric"
-              value={form.capitalStock}
-              onChange={(e) => update("capitalStock", e.target.value)}
-              placeholder="예: 50000000"
-              className="input"
-            />
+          <Field label="자본금 (자동계산)">
+            <p className="rounded-lg bg-zinc-50 p-3 text-sm text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+              {formatWon(toNumber(form.parValue) * toNumber(form.totalShares))}
+              <span className="ml-1 text-xs text-zinc-400 dark:text-zinc-500">(액면가액 × 발행주식총수)</span>
+            </p>
           </Field>
           <Field label="사업개시일" required>
             <input
@@ -373,17 +368,22 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
             </>
           )}
 
-          <Field label="영업권 상당액 (선택)">
+          <p className="rounded-lg bg-zinc-50 p-3 text-xs leading-relaxed text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+            영업권 상당액은 순손익액·순자산가액을 바탕으로 시행령 제59조 제2항 산식에 따라 자동으로
+            계산되어 순자산가치에 반영됩니다 (결과 화면에서 확인 가능). 사업개시 후 3년 미만 법인은
+            영업권을 반영하지 않습니다.
+          </p>
+          <Field label="매입한 영업권 등 차감액 (선택)">
             <input
               type="number"
               inputMode="numeric"
-              value={form.goodwill}
-              onChange={(e) => update("goodwill", e.target.value)}
+              value={form.purchasedGoodwillDeduction}
+              onChange={(e) => update("purchasedGoodwillDeduction", e.target.value)}
               placeholder="0"
               className="input"
             />
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-              자산총액에 반영되지 않은 영업권이 있다면 입력하세요. 없으면 0으로 두세요.
+              이미 유상으로 취득해 자산에 계상된 영업권(무체재산권)이 있다면 입력하세요. 없으면 0으로 두세요.
             </p>
           </Field>
           <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
@@ -512,7 +512,8 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
 
           <div className="flex flex-col gap-3 rounded-xl bg-zinc-50 p-5 dark:bg-zinc-900">
             <ResultRow label="1주당 순손익가치" value={formatWon(result.netProfitValuePerShare)} />
-            <ResultRow label="1주당 순자산가치" value={formatWon(result.netAssetValuePerShare)} />
+            <ResultRow label="계산된 영업권 (총액)" value={formatWon(result.computedGoodwill)} />
+            <ResultRow label="1주당 순자산가치 (영업권 포함)" value={formatWon(result.netAssetValuePerShare)} />
             <ResultRow
               label={
                 result.isUnder3YearsSinceStart
@@ -529,6 +530,12 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
             <ResultRow label="최종 1주당 평가액" value={formatWon(result.finalValuePerShare)} emphasize />
             <ResultRow label="총 평가액" value={formatWon(result.totalCompanyValue)} emphasize />
           </div>
+
+          {result.isThreeYearDeficit && form.isMajorShareholder && !form.isSmallBusiness && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              최근 3개년 연속 결손(순손익액이 모두 음수)이 확인되어, 최대주주 할증평가가 면제되었습니다.
+            </p>
+          )}
 
           {result.netAssetFloorApplied && (
             <p className="text-xs text-amber-700 dark:text-amber-400">
