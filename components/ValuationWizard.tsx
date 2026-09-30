@@ -6,7 +6,7 @@ import ExpertContactCTA from "@/components/ExpertContactCTA";
 import NetProfitUpload from "@/components/NetProfitUpload";
 import NetAssetUpload, { type NetAssetResult } from "@/components/NetAssetUpload";
 
-const STEPS = ["로직 설명", "기본정보", "순자산가치", "순손익가치", "기타사항", "결과"] as const;
+const STEPS = ["기본정보", "순자산가치", "순손익가치", "기타사항", "결과"] as const;
 
 const initialForm = {
   companyName: "",
@@ -67,15 +67,15 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
   const isResultStep = step === STEPS.length - 1;
 
   function canProceed() {
-    if (step === 1) {
+    if (step === 0) {
       return toNumber(form.totalShares) > 0 && form.businessStartDate !== "" && form.valuationDate !== "";
     }
-    if (step === 2) {
+    if (step === 1) {
       return form.netAssetInputMode === "adjusted"
         ? form.totalAssets !== "" && form.totalLiabilities !== ""
         : form.bookAssets !== "" && form.bookLiabilities !== "";
     }
-    if (step === 3) {
+    if (step === 2) {
       return form.capitalizationRatePercent !== "" && toNumber(form.capitalizationRatePercent) > 0;
     }
     return true;
@@ -142,41 +142,6 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
 
       <div className="flex flex-1 flex-col gap-8 rounded-2xl border border-black/10 bg-white p-8 shadow-sm dark:border-white/10 dark:bg-zinc-950">
       {step === 0 && (
-        <StepSection
-          title="세법상 비상장주식 평가, 이렇게 계산돼요"
-          description="본격적인 입력에 앞서, 계산 방식을 간단히 설명드릴게요."
-        >
-          <ol className="flex flex-col gap-3 text-sm text-zinc-600 dark:text-zinc-300">
-            <li>
-              <b className="text-zinc-900 dark:text-zinc-50">1. 순손익가치와 순자산가치를 각각 계산해요.</b>
-              <br />
-              최근 3개년 손익을 가중평균한 값으로 순손익가치를, 자산에서 부채를 뺀 값으로 순자산가치를 구해요.
-            </li>
-            <li>
-              <b className="text-zinc-900 dark:text-zinc-50">2. 두 가치를 3:2로 가중평균해요.</b>
-              <br />
-              (순손익가치 × 3 + 순자산가치 × 2) ÷ 5. 부동산 등 자산이 50% 이상인 법인은 2:3으로 계산해요.
-            </li>
-            <li>
-              <b className="text-zinc-900 dark:text-zinc-50">3. 순자산가치의 80%보다 낮으면 80%로 올려요.</b>
-              <br />
-              가중평균액이 순자산가치의 80%에 미달하면, 순자산가치의 80%를 하한으로 적용해요.
-            </li>
-            <li>
-              <b className="text-zinc-900 dark:text-zinc-50">4. 설립 3년 미만이면 순자산가치만 사용해요.</b>
-              <br />
-              사업개시일로부터 평가기준일까지 3년이 안 됐다면, 손익 실적을 신뢰하기 어려워 순자산가치로만 평가해요.
-            </li>
-            <li>
-              <b className="text-zinc-900 dark:text-zinc-50">5. 최대주주라면 20%를 더해요.</b>
-              <br />
-              중소기업이 아닌 법인의 최대주주 및 특수관계인 지분은 평가액의 20%를 가산해요 (중소기업은 면제).
-            </li>
-          </ol>
-        </StepSection>
-      )}
-
-      {step === 1 && (
         <StepSection title="기본정보" description="평가 대상 회사의 기본 정보를 입력하세요.">
           <Field label="법인명 (선택)">
             <input
@@ -252,7 +217,7 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
         </StepSection>
       )}
 
-      {step === 2 && (
+      {step === 1 && (
         <StepSection title="순자산가치" description="평가기준일 현재 세법상 자산·부채 총액을 입력하세요.">
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -399,7 +364,7 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
         </StepSection>
       )}
 
-      {step === 3 && (
+      {step === 2 && (
         <StepSection
           title="순손익가치"
           description="최근 3개 사업연도의 순손익액(세무조정 후 총액)을 입력하세요. 손익계산서·세무조정계산서가 있다면 AI가 자동으로 계산해드려요."
@@ -461,7 +426,7 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
         </StepSection>
       )}
 
-      {step === 4 && (
+      {step === 3 && (
         <StepSection title="기타사항" description="할증평가 적용 여부를 확인하기 위한 정보를 입력하세요.">
           <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300">
             <input
