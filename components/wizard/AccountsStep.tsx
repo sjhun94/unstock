@@ -14,6 +14,8 @@ import {
   fixedAssetTaxValue,
   isCorporateTaxEmpty,
   matchPreset,
+  parseEmployees,
+  parseFixedAssets,
   num,
   severanceEstimate,
   standardRate,
@@ -38,6 +40,7 @@ import {
   formatWon,
 } from "./ui";
 import ImportPanel from "./ImportPanel";
+import RowPastePanel from "./RowPastePanel";
 
 interface Context {
   valuationDate: string;
@@ -227,6 +230,21 @@ function FixedAssetsEditor({
   const rows = account.fixedAssets;
   return (
     <div className="flex flex-col gap-3">
+      <RowPastePanel
+        title="엑셀에서 자산 명세 붙여넣기"
+        description="감가상각 명세(감가조서)에서 자산명·취득일·취득가액 열을, 있으면 내용연수·상각방법(정률/정액)·상각률 열도 함께 복사해 붙여넣으세요. 내용연수가 없으면 5년으로 넣어요."
+        placeholder={"노트북\t2023-01-15\t1,000,000\t5\t정률법\n..."}
+        parse={parseFixedAssets}
+        hasExisting={rows.length > 0}
+        columns={[
+          { label: "자산명", render: (r) => r.name || "-" },
+          { label: "취득일", render: (r) => r.acquisitionDate },
+          { label: "취득가액", render: (r) => formatWon(num(r.cost)), align: "right" },
+          { label: "내용연수", render: (r) => `${r.usefulLifeYears}년`, align: "right" },
+          { label: "상각방법", render: (r) => (r.method === "straight" ? "정액법" : "정률법") },
+        ]}
+        onApply={(imported, mode) => onChange({ fixedAssets: mode === "replace" ? imported : [...rows, ...imported] })}
+      />
       {rows.map((asset) => {
         const computed = fixedAssetTaxValue(asset, context.valuationDate, context.fiscalYearEndMonth);
         const standard = standardRate(asset.method, num(asset.usefulLifeYears));
@@ -401,6 +419,25 @@ function EmployeesEditor({
   const rows = account.employees;
   return (
     <div className="flex flex-col gap-3">
+      <RowPastePanel
+        title="엑셀에서 직원 명세 붙여넣기"
+        description="직원별로 이름(또는 구분)·입사일·급여 열을 복사해 붙여넣으세요. 금액이 1개면 월평균급여, 2개면 월급여와 연간상여, 3개면 최근 3개월 급여, 4개면 3개월 급여와 연간상여로 읽어요."
+        placeholder={"직원A\t2020-09-30\t3,000,000\t3,000,000\t3,000,000\t6,000,000\n..."}
+        parse={parseEmployees}
+        hasExisting={rows.length > 0}
+        columns={[
+          { label: "구분", render: (r) => r.name || "-" },
+          { label: "입사일", render: (r) => r.hireDate },
+          {
+            label: "월평균급여",
+            render: (r) => formatWon((num(r.wage1) + num(r.wage2) + num(r.wage3)) / 3),
+            align: "right",
+          },
+          { label: "연간상여", render: (r) => formatWon(num(r.annualBonus)), align: "right" },
+          { label: "추계액", render: (r) => formatWon(severanceEstimate(r, context.valuationDate)), align: "right" },
+        ]}
+        onApply={(imported, mode) => onChange({ employees: mode === "replace" ? imported : [...rows, ...imported] })}
+      />
       {rows.map((employee, index) => {
         const update = (patch: Partial<typeof employee>) => onChange({ employees: replaceById(rows, employee.id, patch) });
         return (

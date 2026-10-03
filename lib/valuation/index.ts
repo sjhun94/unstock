@@ -6,4 +6,14 @@ export { corporateTaxPayable, isCorporateTaxEmpty, type CorporateTaxResult } fro
 export { accountValue, severanceEstimate, type AccountValue } from "./accounts.ts";
 export { netIncomeYear, corporateTaxEtc, type NetIncomeYearResult } from "./netIncome.ts";
 export { calculateValuation, type ValuationResult } from "./calculate.ts";
-export { parseBalanceSheet, rowsToAccounts, matchPreset, type ImportedRow, type ImportResult } from "./importSheet.ts";
+export {
+  parseBalanceSheet,
+  rowsToAccounts,
+  matchPreset,
+  parseFixedAssets,
+  parseEmployees,
+  parseDateCell,
+  type ImportedRow,
+  type ImportResult,
+  type RowImport,
+} from "./importSheet.ts";

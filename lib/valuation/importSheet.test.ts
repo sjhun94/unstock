@@ -65,3 +65,55 @@ test("직접 입력 방식 계정은 평가액을 장부가액으로 미리 채�
   assert.equal(accounts[0].manualValue, "35000");
   assert.equal(accounts[0].bookValue, "35000");
 });
+
+import { parseDateCell, parseEmployees, parseFixedAssets } from "./index.ts";
+
+test("날짜 형식 인식", () => {
+  assert.equal(parseDateCell("2018-08-30"), "2018-08-30");
+  assert.equal(parseDateCell("2018.8.3"), "2018-08-03");
+  assert.equal(parseDateCell("2018. 8. 30."), "2018-08-30");
+  assert.equal(parseDateCell("2018/08/30"), "2018-08-30");
+  assert.equal(parseDateCell("20180830"), "2018-08-30");
+  assert.equal(parseDateCell("2018-02-30"), null);
+  assert.equal(parseDateCell("1,000,000"), null);
+});
+
+test("자산 명세 붙여넣기: 헤더·합계 제외, 취득가액·내용연수·상각방법·상각률 인식", () => {
+  const text = [
+    "자산명\t취득일\t취득가액\t내용연수\t상각방법",
+    "노트북\t2023-01-15\t1,000,000\t5\t정률법",
+    "서버\t2022.07.01\t12,000,000\t4\t정액법\t0.25",
+    "모니터\t2024/03/02\t300,000",
+    "합계\t\t13,300,000",
+  ].join("\n");
+  const { rows, skipped } = parseFixedAssets(text);
+  assert.equal(skipped, 2);
+  assert.deepEqual(
+    rows.map((r) => [r.name, r.acquisitionDate, r.cost, r.usefulLifeYears, r.method, r.rate]),
+    [
+      ["노트북", "2023-01-15", "1000000", "5", "declining", ""],
+      ["서버", "2022-07-01", "12000000", "4", "straight", "0.25"],
+      ["모니터", "2024-03-02", "300000", "5", "declining", ""],
+    ],
+  );
+});
+
+test("직원 명세 붙여넣기: 금액 개수에 따라 급여·상여 배정", () => {
+  const text = [
+    "성명\t입사일\t7월\t8월\t9월\t상여",
+    "직원A\t2020-09-30\t3,000,000\t3,100,000\t3,200,000\t6,000,000",
+    "직원B\t2021.03.02\t2,500,000",
+    "직원C\t2022-01-03\t4,000,000\t8,000,000",
+    "합계\t\t9,500,000",
+  ].join("\n");
+  const { rows, skipped } = parseEmployees(text);
+  assert.equal(skipped, 2);
+  assert.deepEqual(
+    rows.map((r) => [r.name, r.hireDate, r.wage1, r.wage2, r.wage3, r.annualBonus]),
+    [
+      ["직원A", "2020-09-30", "3000000", "3100000", "3200000", "6000000"],
+      ["직원B", "2021-03-02", "2500000", "2500000", "2500000", ""],
+      ["직원C", "2022-01-03", "4000000", "4000000", "4000000", "8000000"],
+    ],
+  );
+});

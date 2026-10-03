@@ -1,6 +1,7 @@
 // 엑셀에서 복사한 재무상태표(탭으로 구분된 텍스트)를 계정 목록으로 바꿉니다.
-import { ACCOUNT_PRESETS, createAccount, type AccountPreset } from "./defaults.ts";
-import type { Account, Side, ValuationMethod } from "./types.ts";
+import { ACCOUNT_PRESETS, createAccount, createEmployee, createFixedAsset, type AccountPreset } from "./defaults.ts";
+import { parseYmd } from "./num.ts";
+import type { Account, DepreciationMethod, EmployeeRow, FixedAssetRow, Side, ValuationMethod } from "./types.ts";
 
 export interface ImportedRow {
   side: Side;
@@ -141,4 +142,104 @@ export function rowsToAccounts(rows: ImportedRow[]): Account[] {
     // 직접 입력 방식은 평가액을 장부가액으로 미리 채워 둠 (사용자가 고칠 때까지 평가차액 0)
     return { ...account, bookValue: book, manualValue: row.method === "manual" ? book : "" };
   });
+}
+
+// ───── 명세 붙여넣기 (감가상각 자산, 직원) ─────
+
+export interface RowImport<T> {
+  rows: T[];
+  skipped: number;
+}
+
+function splitCells(line: string) {
+  return (line.includes("\t") ? line.split("\t") : line.split(/\s{2,}/)).map((cell) => cell.trim());
+}
+
+// 2018-08-30, 2018.8.30, 2018. 8. 30., 2018/08/30, 20180830 → YYYY-MM-DD
+export function parseDateCell(cell: string): string | null {
+  const text = cell.trim().replace(/\.$/, "");
+  const match = /^(\d{4})[.\-/]\s*(\d{1,2})[.\-/]\s*(\d{1,2})$/.exec(text) ?? /^(\d{4})(\d{2})(\d{2})$/.exec(text);
+  if (!match) return null;
+  const ymd = `${match[1]}-${match[2].padStart(2, "0")}-${match[3].padStart(2, "0")}`;
+  return parseYmd(ymd) ? ymd : null;
+}
+
+function isTotalLine(cells: string[]) {
+  return cells.some((cell) => /합계|소계|총계|^계$/.test(cell.replace(/\s/g, "")));
+}
+
+export function parseFixedAssets(text: string): RowImport<FixedAssetRow> {
+  const rows: FixedAssetRow[] = [];
+  let skipped = 0;
+  for (const line of text.split(/\r?\n/)) {
+    if (line.trim() === "") continue;
+    const cells = splitCells(line);
+    const dateIndex = cells.findIndex((cell) => parseDateCell(cell) !== null);
+    if (dateIndex < 0 || isTotalLine(cells)) {
+      skipped++;
+      continue;
+    }
+    const method: DepreciationMethod = cells.some((c) => /정액/.test(c)) ? "straight" : "declining";
+    const name = cells.find((c, i) => i !== dateIndex && /[가-힣A-Za-z]/.test(c) && parseAmount(c) === null && !/정액|정률/.test(c)) ?? "";
+    const numbers = cells.map((c, i) => (i === dateIndex ? null : parseAmount(c))).filter((n): n is number => n !== null);
+    const cost = Math.max(0, ...numbers.filter((n) => n > 60));
+    const life = numbers.find((n) => Number.isInteger(n) && n >= 1 && n <= 60);
+    const rate = numbers.find((n) => n > 0 && n < 1);
+    if (cost <= 0) {
+      skipped++;
+      continue;
+    }
+    rows.push({
+      ...createFixedAsset(),
+      name,
+      acquisitionDate: parseDateCell(cells[dateIndex])!,
+      cost: String(cost),
+      usefulLifeYears: life ? String(life) : "5",
+      method,
+      rate: rate ? String(rate) : "",
+    });
+  }
+  return { rows, skipped };
+}
+
+export function parseEmployees(text: string): RowImport<EmployeeRow> {
+  const rows: EmployeeRow[] = [];
+  let skipped = 0;
+  for (const line of text.split(/\r?\n/)) {
+    if (line.trim() === "") continue;
+    const cells = splitCells(line);
+    const dateIndex = cells.findIndex((cell) => parseDateCell(cell) !== null);
+    if (dateIndex < 0 || isTotalLine(cells)) {
+      skipped++;
+      continue;
+    }
+    const name = cells.find((c, i) => i !== dateIndex && /[가-힣A-Za-z]/.test(c) && parseAmount(c) === null) ?? "";
+    const amounts = cells
+      .map((c, i) => (i === dateIndex ? null : parseAmount(c)))
+      .filter((n): n is number => n !== null && n >= 1000);
+    if (amounts.length === 0) {
+      skipped++;
+      continue;
+    }
+    let wages: number[];
+    let bonus = 0;
+    if (amounts.length === 1) wages = [amounts[0], amounts[0], amounts[0]];
+    else if (amounts.length === 2) {
+      wages = [amounts[0], amounts[0], amounts[0]];
+      bonus = amounts[1];
+    } else {
+      wages = amounts.slice(0, 3);
+      bonus = amounts[3] ?? 0;
+    }
+    rows.push({
+      ...createEmployee(),
+      name,
+      hireDate: parseDateCell(cells[dateIndex])!,
+      wage1: String(wages[0]),
+      wage2: String(wages[1]),
+      wage3: String(wages[2]),
+      annualBonus: bonus ? String(bonus) : "",
+    });
+  }
+  return { rows, skipped };
 }
