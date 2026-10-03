@@ -30,7 +30,6 @@ import {
   Checkbox,
   DateInput,
   MiniField,
-  Note,
   NumberInput,
   RemoveButton,
   ResultRow,
@@ -51,12 +50,12 @@ const SIDE_TEXT: Record<Side, { title: string; description: string }> = {
   asset: {
     title: "자산 평가",
     description:
-      "평가기준일 현재 재무상태표의 자산 계정을 입력하고, 계정마다 상증세법상 평가방법을 고르세요. 회사에 없는 계정은 삭제하고, 필요한 계정은 추가할 수 있어요.",
+      "평가기준일 현재 재무상태표를 엑셀에서 복사해 붙여넣으세요. 붙여넣은 계정마다 상증세법상 평가방법을 확인하고, 필요하면 계정을 추가하거나 삭제할 수 있어요.",
   },
   liability: {
     title: "부채 평가",
     description:
-      "평가기준일 현재 재무상태표의 부채 계정을 입력하세요. 부채는 평가기준일 현재 지급의무가 확정된 금액만 인정됩니다.",
+      "자산 단계에서 재무상태표 전체를 붙여넣었다면 부채도 함께 들어와 있어요. 부채만 따로 붙여넣을 수도 있어요. 부채는 평가기준일 현재 지급의무가 확정된 금액만 인정됩니다.",
   },
 };
 
@@ -93,8 +92,6 @@ export default function AccountsStep({
     <StepSection title={SIDE_TEXT[side].title} description={SIDE_TEXT[side].description}>
       <ImportPanel side={side} accounts={accounts} onChange={onChange} />
 
-      {sideAccounts.length === 0 && <Note>입력된 계정이 없습니다. 아래에서 계정을 추가하세요.</Note>}
-
       {sideAccounts.map((account) => (
         <AccountCard
           key={account.id}
@@ -106,29 +103,33 @@ export default function AccountsStep({
         />
       ))}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={presetName}
-          onChange={(e) => setPresetName(e.target.value)}
-          aria-label="추가할 계정과목"
-          className="input w-auto flex-1"
-        >
-          {presets.map((preset) => (
-            <option key={preset.name} value={preset.name}>
-              {preset.name}
-            </option>
-          ))}
-        </select>
-        <button type="button" onClick={addAccount} className="btn-secondary">
-          계정 추가
-        </button>
-      </div>
+      {sideAccounts.length > 0 && (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              aria-label="추가할 계정과목"
+              className="input w-auto flex-1"
+            >
+              {presets.map((preset) => (
+                <option key={preset.name} value={preset.name}>
+                  {preset.name}
+                </option>
+              ))}
+            </select>
+            <button type="button" onClick={addAccount} className="btn-secondary">
+              계정 추가
+            </button>
+          </div>
 
-      <div className="flex flex-col gap-2 rounded-xl bg-zinc-50 p-4 dark:bg-zinc-900">
-        <ResultRow label="재무상태표 금액 합계" value={formatWon(bookTotal)} />
-        <ResultRow label="상증세법상 평가액 합계" value={formatWon(taxTotal)} />
-        <ResultRow label="평가차액 합계" value={formatWon(taxTotal - bookTotal)} emphasize />
-      </div>
+          <div className="flex flex-col gap-2 rounded-xl bg-zinc-50 p-4 dark:bg-zinc-900">
+            <ResultRow label="재무상태표 금액 합계" value={formatWon(bookTotal)} />
+            <ResultRow label="상증세법상 평가액 합계" value={formatWon(taxTotal)} />
+            <ResultRow label="평가차액 합계" value={formatWon(taxTotal - bookTotal)} emphasize />
+          </div>
+        </>
+      )}
     </StepSection>
   );
 }

@@ -76,25 +76,6 @@ export const ACCOUNT_PRESETS: AccountPreset[] = [
   { side: "liability", name: "기타 부채", method: "book", hint: "평가방법을 선택하세요." },
 ];
 
-// 처음 화면에 기본으로 보여줄 계정과목
-const DEFAULT_ACCOUNT_NAMES = [
-  "현금및현금성자산",
-  "매출채권",
-  "선급금",
-  "선급비용",
-  "계약자산",
-  "유형자산(비품 등)",
-  "무형자산(소프트웨어 등)",
-  "임차보증금",
-  "이연법인세자산",
-  "미지급금",
-  "예수금",
-  "부가세예수금",
-  "당기법인세부채",
-  "미지급비용",
-  "퇴직급여충당부채",
-  "장기미지급금",
-];
 
 export function emptyCorporateTax(): CorporateTaxInput {
   return {
@@ -181,11 +162,6 @@ export function emptyNetIncomeYear(): NetIncomeYear {
 }
 
 export function createInitialState(): ValuationState {
-  const accounts = DEFAULT_ACCOUNT_NAMES.map((name) => {
-    const preset = ACCOUNT_PRESETS.find((p) => p.name === name)!;
-    return createAccount(preset.side, preset.name, preset.method);
-  });
-
   return {
     basic: {
       companyName: "",
@@ -195,7 +171,7 @@ export function createInitialState(): ValuationState {
       valuationDate: "",
       fiscalYearEndMonth: "12",
     },
-    accounts,
+    accounts: [],
     adjustments: { reserves: [], liabilityTaxEtc: "", purchasedGoodwill: "", capitalizationRatePercent: "10" },
     netIncome: [emptyNetIncomeYear(), emptyNetIncomeYear(), emptyNetIncomeYear()],
     judgment: {
