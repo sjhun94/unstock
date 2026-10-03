@@ -13,6 +13,7 @@ import {
   createUnconfirmed,
   fixedAssetTaxValue,
   isCorporateTaxEmpty,
+  matchPreset,
   num,
   severanceEstimate,
   standardRate,
@@ -36,6 +37,7 @@ import {
   TextInput,
   formatWon,
 } from "./ui";
+import ImportPanel from "./ImportPanel";
 
 interface Context {
   valuationDate: string;
@@ -86,6 +88,8 @@ export default function AccountsStep({
 
   return (
     <StepSection title={SIDE_TEXT[side].title} description={SIDE_TEXT[side].description}>
+      <ImportPanel side={side} accounts={accounts} onChange={onChange} />
+
       {sideAccounts.length === 0 && <Note>입력된 계정이 없습니다. 아래에서 계정을 추가하세요.</Note>}
 
       {sideAccounts.map((account) => (
@@ -139,7 +143,7 @@ function AccountCard({
   onChange: (patch: Partial<Account>) => void;
   onRemove: () => void;
 }) {
-  const hint = ACCOUNT_PRESETS.find((preset) => preset.side === account.side && preset.name === account.name)?.hint;
+  const hint = matchPreset(account.name, account.side)?.hint;
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
