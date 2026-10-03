@@ -5,7 +5,6 @@ import {
   calculateValuation,
   createInitialState,
   num,
-  parseYmd,
   type NetIncomeYear,
   type ValuationState,
 } from "@/lib/valuation/index.ts";
@@ -30,15 +29,10 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
     fiscalYearEndMonth: num(state.basic.fiscalYearEndMonth) || 12,
   };
 
-  const basicsValid =
-    num(state.basic.totalShares) > 0 &&
-    parseYmd(state.basic.businessStartDate) !== null &&
-    parseYmd(state.basic.valuationDate) !== null;
   const isResultStep = step === STEPS.length - 1;
-  const canProceed = step === 0 ? basicsValid : true;
 
   function goNext() {
-    if (canProceed) setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
   }
 
   function goBack() {
@@ -63,7 +57,7 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
   return (
     <div className="flex w-full max-w-5xl flex-col gap-8 sm:flex-row">
       <div className="flex shrink-0 flex-col gap-6 sm:w-48">
-        <Timeline step={step} canJump={basicsValid} onJump={setStep} />
+        <Timeline step={step} onJump={setStep} />
         {result.ready && (
           <div className="hidden flex-col gap-1 rounded-xl border border-zinc-200 p-3 sm:flex dark:border-zinc-800">
             <span className="text-xs text-zinc-500 dark:text-zinc-400">현재 1주당 평가액</span>
@@ -111,7 +105,7 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
               처음부터 다시
             </button>
           ) : (
-            <button type="button" onClick={goNext} disabled={!canProceed} className="btn-primary disabled:opacity-40">
+            <button type="button" onClick={goNext} className="btn-primary">
               다음단계
             </button>
           )}
@@ -121,14 +115,13 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
   );
 }
 
-function Timeline({ step, canJump, onJump }: { step: number; canJump: boolean; onJump: (step: number) => void }) {
+function Timeline({ step, onJump }: { step: number; onJump: (step: number) => void }) {
   return (
     <ol className="flex gap-4 overflow-x-auto sm:flex-col sm:gap-0 sm:overflow-visible">
       {STEPS.map((label, i) => {
         const isDone = i < step;
         const isCurrent = i === step;
         const isLast = i === STEPS.length - 1;
-        const enabled = canJump || i === 0;
         return (
           <li key={label} className="flex shrink-0 items-center gap-3 sm:items-stretch">
             <div className="flex flex-col items-center">
@@ -156,7 +149,6 @@ function Timeline({ step, canJump, onJump }: { step: number; canJump: boolean; o
             <button
               type="button"
               onClick={() => onJump(i)}
-              disabled={!enabled}
               aria-current={isCurrent ? "step" : undefined}
               className={
                 "self-start text-left text-sm sm:pb-8 " +
@@ -164,7 +156,7 @@ function Timeline({ step, canJump, onJump }: { step: number; canJump: boolean; o
                   ? "font-semibold text-zinc-900 dark:text-zinc-50"
                   : isDone
                     ? "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-                    : "text-zinc-400 enabled:hover:text-zinc-700 dark:text-zinc-600 dark:enabled:hover:text-zinc-300")
+                    : "text-zinc-400 hover:text-zinc-700 dark:text-zinc-600 dark:hover:text-zinc-300")
               }
             >
               {label}

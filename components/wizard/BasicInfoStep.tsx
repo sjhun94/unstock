@@ -8,14 +8,14 @@ export default function BasicInfoStep({ value, onChange }: { value: BasicInfo; o
 
   return (
     <StepSection title="기본정보" description="평가 대상 회사의 기본 정보를 입력하세요.">
-      <Field label="법인명 (선택)">
+      <Field label="법인명">
         <TextInput value={value.companyName} onChange={(companyName) => set({ companyName })} placeholder="예: (주)예시" />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="1주당 액면가액 (선택)">
+        <Field label="1주당 액면가액">
           <NumberInput value={value.parValue} onChange={(parValue) => set({ parValue })} placeholder="예: 5,000" />
         </Field>
-        <Field label="발행주식총수" required>
+        <Field label="발행주식총수" hint="1주당 금액을 계산하려면 필요합니다.">
           <NumberInput value={value.totalShares} onChange={(totalShares) => set({ totalShares })} placeholder="예: 10,000" />
         </Field>
       </div>
@@ -26,10 +26,10 @@ export default function BasicInfoStep({ value, onChange }: { value: BasicInfo; o
         </p>
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="사업개시일" required hint="평가기준일까지 3년이 안 되면 순자산가치만으로 평가합니다.">
+        <Field label="사업개시일" hint="평가기준일까지 3년이 안 되면 순자산가치만으로 평가합니다.">
           <DateInput value={value.businessStartDate} onChange={(businessStartDate) => set({ businessStartDate })} />
         </Field>
-        <Field label="평가기준일" required hint="재무상태표 기준일과 같은 날로 입력하세요.">
+        <Field label="평가기준일" hint="재무상태표 기준일과 같은 날로 입력하세요.">
           <DateInput value={value.valuationDate} onChange={(valuationDate) => set({ valuationDate })} />
         </Field>
       </div>

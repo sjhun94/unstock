@@ -49,7 +49,7 @@ export default function AdjustmentsStep({ value, onChange }: { value: Adjustment
         <NumberInput value={value.purchasedGoodwill} onChange={(purchasedGoodwill) => onChange({ ...value, purchasedGoodwill })} />
       </Field>
 
-      <Field label="순손익가치 환원율 (%)" required hint="기획재정부령으로 정하는 이자율. 현재 10%입니다.">
+      <Field label="순손익가치 환원율 (%)" hint="기획재정부령으로 정하는 이자율. 현재 10%입니다.">
         <NumberInput
           value={value.capitalizationRatePercent}
           onChange={(capitalizationRatePercent) => onChange({ ...value, capitalizationRatePercent })}

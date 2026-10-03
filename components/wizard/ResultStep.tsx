@@ -20,6 +20,10 @@ export default function ResultStep({ state, result }: { state: ValuationState; r
       title="평가 결과"
       description={name ? `${name}의 비상장주식 평가 결과입니다.` : "비상장주식 평가 결과입니다."}
     >
+      {!result.ready && (
+        <Note tone="warning">발행주식총수를 입력하지 않아 1주당 금액을 계산할 수 없어요. 기본정보 단계에서 입력해 주세요.</Note>
+      )}
+
       <div className="flex flex-col gap-2 rounded-xl bg-zinc-900 p-5 text-white dark:bg-zinc-50 dark:text-zinc-900">
         <span className="text-xs opacity-70">1주당 평가액</span>
         <span className="text-3xl font-bold tabular-nums">{formatWon(perShare.final)}</span>
