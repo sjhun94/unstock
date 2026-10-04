@@ -27,4 +27,21 @@ export {
   type ImportedRow,
   type ImportResult,
   type RowImport,
+  type SheetTotals,
 } from "./importSheet.ts";
+export {
+  parseTaxReturn,
+  taxReturnPatch,
+  parseIncomeAdjustments,
+  parseReserves,
+  reserveDecision,
+  detectPeriod,
+  yearIndexOf,
+  corporateTaxByBrackets,
+  type TaxReturnResult,
+  type IncomeAdjustmentResult,
+  type AdjustmentItem,
+  type ReserveImport,
+  type FiscalPeriod,
+} from "./importTax.ts";
+export { reviewValuation, fiscalYearEnds, type ReviewItem, type ReviewLevel, type ReviewStep } from "./review.ts";

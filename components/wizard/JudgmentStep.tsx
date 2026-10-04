@@ -13,7 +13,8 @@ export default function JudgmentStep({
   onChange: (value: Judgment) => void;
 }) {
   const set = (patch: Partial<Judgment>) => onChange({ ...value, ...patch });
-  const { realEstate, method } = result;
+  const { realEstate, method, auto } = result;
+  const autoWon = (n: number) => `자동 ${formatWon(n)}`;
 
   return (
     <StepSection
@@ -22,22 +23,22 @@ export default function JudgmentStep({
     >
       <SubSection
         title="부동산과다보유법인 판정"
-        description="부동산 등 비율이 50%를 넘으면 순손익 2 : 순자산 3으로, 80% 이상이면 순자산가치만으로 평가합니다. 부동산이 없으면 비워두세요."
+        description="부동산 등 비율이 50%를 넘으면 순손익 2 : 순자산 3으로, 80% 이상이면 순자산가치만으로 평가합니다. 칸을 비워 두면 재무상태표·자산 평가·유보에서 자동으로 계산한 값(흐린 글씨)을 써요. 다르게 보려면 직접 입력하세요."
       >
         <ResultRow label="① 장부상 총자산 (자산 단계 합계)" value={formatWon(realEstate.bookAssets)} />
         <MiniField label="② 유보금액 가감">
-          <NumberInput value={value.reserveAdjust} onChange={(reserveAdjust) => set({ reserveAdjust })} />
+          <NumberInput value={value.reserveAdjust} onChange={(reserveAdjust) => set({ reserveAdjust })} placeholder={autoWon(auto.reserveAdjust)} />
         </MiniField>
         <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300">④ 총자산에서 빼는 금액 (장부가액)</span>
         <div className="grid gap-2 sm:grid-cols-2">
           <MiniField label="토지">
-            <NumberInput value={value.deductLand} onChange={(deductLand) => set({ deductLand })} />
+            <NumberInput value={value.deductLand} onChange={(deductLand) => set({ deductLand })} placeholder={autoWon(auto.deductLand)} />
           </MiniField>
           <MiniField label="건물 (부속 시설물·구축물 포함)">
-            <NumberInput value={value.deductBuilding} onChange={(deductBuilding) => set({ deductBuilding })} />
+            <NumberInput value={value.deductBuilding} onChange={(deductBuilding) => set({ deductBuilding })} placeholder={autoWon(auto.deductBuilding)} />
           </MiniField>
           <MiniField label="무형자산">
-            <NumberInput value={value.deductIntangible} onChange={(deductIntangible) => set({ deductIntangible })} />
+            <NumberInput value={value.deductIntangible} onChange={(deductIntangible) => set({ deductIntangible })} placeholder={autoWon(auto.deductIntangible)} />
           </MiniField>
           <MiniField label="1년 내 차입·증자로 늘어난 금융자산·대여금">
             <NumberInput value={value.deductFinancial} onChange={(deductFinancial) => set({ deductFinancial })} />
@@ -46,10 +47,10 @@ export default function JudgmentStep({
         <span className="text-xs font-medium text-zinc-600 dark:text-zinc-300">⑤ 부동산 보유금액 [기준시가와 장부가액 중 큰 금액]</span>
         <div className="grid gap-2 sm:grid-cols-3">
           <MiniField label="토지">
-            <NumberInput value={value.realEstateLand} onChange={(realEstateLand) => set({ realEstateLand })} />
+            <NumberInput value={value.realEstateLand} onChange={(realEstateLand) => set({ realEstateLand })} placeholder={autoWon(auto.realEstateLand)} />
           </MiniField>
           <MiniField label="건물">
-            <NumberInput value={value.realEstateBuilding} onChange={(realEstateBuilding) => set({ realEstateBuilding })} />
+            <NumberInput value={value.realEstateBuilding} onChange={(realEstateBuilding) => set({ realEstateBuilding })} placeholder={autoWon(auto.realEstateBuilding)} />
           </MiniField>
           <MiniField label="부동산과다법인 주식의 부동산 상당액">
             <NumberInput value={value.realEstateStock} onChange={(realEstateStock) => set({ realEstateStock })} />
@@ -65,7 +66,7 @@ export default function JudgmentStep({
 
       <SubSection title="순자산가치만으로 평가하는 사유" description="하나라도 해당하면 순손익가치를 쓰지 않고 순자산가치만으로 평가합니다.">
         <MiniField label="자산총액 중 주식 등의 비율 (%) — 80% 이상이면 해당">
-          <NumberInput value={value.stockRatioPercent} onChange={(stockRatioPercent) => set({ stockRatioPercent })} />
+          <NumberInput value={value.stockRatioPercent} onChange={(stockRatioPercent) => set({ stockRatioPercent })} placeholder={`자동 ${auto.stockRatioPercent}%`} />
         </MiniField>
         <Checkbox checked={value.liquidation} onChange={(liquidation) => set({ liquidation })}>
           청산절차가 진행 중이거나 사업을 계속하기 곤란한 법인

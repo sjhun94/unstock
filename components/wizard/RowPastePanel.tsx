@@ -16,6 +16,7 @@ export default function RowPastePanel<T>({
   parse,
   columns,
   hasExisting,
+  emptyMessage = "읽을 수 있는 줄이 없어요. 날짜와 금액이 있는 열을 함께 복사했는지 확인해 주세요.",
   onApply,
 }: {
   title: string;
@@ -24,6 +25,7 @@ export default function RowPastePanel<T>({
   parse: (text: string) => RowImport<T>;
   columns: PreviewColumn<T>[];
   hasExisting: boolean;
+  emptyMessage?: string;
   onApply: (rows: T[], mode: "replace" | "append") => void;
 }) {
   const [text, setText] = useState("");
@@ -60,7 +62,7 @@ export default function RowPastePanel<T>({
 
         {parsed && parsed.rows.length === 0 && (
           <p className="text-xs text-amber-700 dark:text-amber-400">
-            읽을 수 있는 줄이 없어요. 날짜와 금액이 있는 열을 함께 복사했는지 확인해 주세요.
+            {emptyMessage}
           </p>
         )}
 

@@ -1,6 +1,7 @@
 // 전체 평가 계산: 순자산가액 → 순손익가치 → 영업권 → 1주당 평가액
 // (상증세법 시행령 제54조, 제55조, 제56조, 제59조)
 import { accountValue, type AccountValue } from "./accounts.ts";
+import { assetReserveTotal } from "./importTax.ts";
 import { netIncomeYear, type NetIncomeYearResult } from "./netIncome.ts";
 import { isWithinYears, num, parseYmd } from "./num.ts";
 import type { ValuationState } from "./types.ts";
@@ -16,6 +17,7 @@ export interface ValuationResult {
     liabilityBook: number;
     liabilityDiff: number;
     liabilityTaxEtc: number;
+    declaredPayables: number; // 결의된 배당금·상여금 등 미지급분
     liabilityTotal: number;
     beforeGoodwill: number; // 영업권 포함 전 순자산가액
     goodwillApplied: number;
@@ -37,6 +39,16 @@ export interface ValuationResult {
     purchased: number;
     value: number;
     excluded: boolean; // 순자산가액에 합산하지 않는 경우
+  };
+  // 평가방법 판정 칸을 비워 두었을 때 쓰는 자동 계산값
+  auto: {
+    reserveAdjust: number;
+    deductLand: number;
+    deductBuilding: number;
+    deductIntangible: number;
+    realEstateLand: number;
+    realEstateBuilding: number;
+    stockRatioPercent: number;
   };
   realEstate: {
     bookAssets: number;
@@ -67,6 +79,49 @@ export interface ValuationResult {
   totalValue: number;
 }
 
+const LAND = /토지|대지|임야|전답/;
+const INTANGIBLE = /소프트웨어|개발비|무형|특허|상표|산업재산권|영업권|라이선스|라이센스/;
+const STOCK = /주식|출자금|지분|유가증권|증권/;
+
+// 평가방법 판정 칸의 자동 계산값 (소득세법 시행령 제158조 방식의 부동산 비율, 주식 등 비율)
+function autoJudgment(state: ValuationState, values: AccountValue[]): ValuationResult["auto"] {
+  let deductLand = 0;
+  let deductBuilding = 0;
+  let realEstateLand = 0;
+  let realEstateBuilding = 0;
+  let deductIntangible = 0;
+  let stocks = 0;
+  let assets = 0;
+  state.accounts.forEach((account, i) => {
+    if (account.side !== "asset") return;
+    const book = values[i].book;
+    assets += book;
+    if (account.method === "realEstate") {
+      // 기준시가(없으면 시가)와 장부가액 중 큰 금액
+      const assessed = account.standardValue.trim() !== "" ? num(account.standardValue) : num(account.marketValue);
+      const value = Math.max(assessed, book);
+      if (LAND.test(account.name)) {
+        deductLand += book;
+        realEstateLand += value;
+      } else {
+        deductBuilding += book;
+        realEstateBuilding += value;
+      }
+    }
+    if (INTANGIBLE.test(account.name.replace(/\s/g, ""))) deductIntangible += book;
+    if (account.method === "listedStock" || (account.method === "manual" && STOCK.test(account.name))) stocks += book;
+  });
+  return {
+    reserveAdjust: assetReserveTotal(state.adjustments.reserves),
+    deductLand,
+    deductBuilding,
+    deductIntangible,
+    realEstateLand,
+    realEstateBuilding,
+    stockRatioPercent: assets > 0 ? Math.round((stocks / assets) * 1000) / 10 : 0,
+  };
+}
+
 export function calculateValuation(state: ValuationState): ValuationResult {
   const { basic, adjustments, judgment } = state;
   const totalShares = num(basic.totalShares);
@@ -86,9 +141,10 @@ export function calculateValuation(state: ValuationState): ValuationResult {
   const liabilityDiff = sumSide("liability", (v) => v.diff);
   const reserveInclude = adjustments.reserves.reduce((total, row) => total + num(row.includeAmount), 0);
   const liabilityTaxEtc = num(adjustments.liabilityTaxEtc);
+  const declaredPayables = num(adjustments.declaredPayables);
 
   const assetTotal = assetBook + assetDiff + reserveInclude;
-  const liabilityTotal = liabilityBook + liabilityDiff + liabilityTaxEtc;
+  const liabilityTotal = liabilityBook + liabilityDiff + liabilityTaxEtc + declaredPayables;
   const beforeGoodwill = assetTotal - liabilityTotal;
 
   // 2) 순손익가치
@@ -97,15 +153,18 @@ export function calculateValuation(state: ValuationState): ValuationResult {
   const rate = num(adjustments.capitalizationRatePercent) / 100;
   const byNetIncome = rate > 0 ? Math.trunc(weightedPerShare / rate) : 0;
 
-  // 3) 부동산과다보유법인 판정
-  const taxAssets = assetBook + num(judgment.reserveAdjust);
+  // 3) 부동산과다보유법인 판정. 칸을 비워 두면 재무상태표·유보에서 자동으로 계산한 값을 씀
+  const auto = autoJudgment(state, accounts.map((a) => a.value));
+  const pick = (value: string, fallback: number) => (value.trim() !== "" ? num(value) : fallback);
+  const taxAssets = assetBook + pick(judgment.reserveAdjust, auto.reserveAdjust);
   const deductTotal =
-    num(judgment.deductLand) +
-    num(judgment.deductBuilding) +
-    num(judgment.deductIntangible) +
+    pick(judgment.deductLand, auto.deductLand) +
+    pick(judgment.deductBuilding, auto.deductBuilding) +
+    pick(judgment.deductIntangible, auto.deductIntangible) +
     num(judgment.deductFinancial);
   const realEstateStock = num(judgment.realEstateStock);
-  const realEstateTotal = num(judgment.realEstateLand) + num(judgment.realEstateBuilding) + realEstateStock;
+  const realEstateTotal =
+    pick(judgment.realEstateLand, auto.realEstateLand) + pick(judgment.realEstateBuilding, auto.realEstateBuilding) + realEstateStock;
   const adjustedAssets = taxAssets - deductTotal + realEstateTotal - realEstateStock;
   const realEstateRatio = adjustedAssets !== 0 ? realEstateTotal / adjustedAssets : 0;
   const isOver80 = realEstateRatio >= 0.8;
@@ -121,7 +180,7 @@ export function calculateValuation(state: ValuationState): ValuationResult {
 
   const netAssetOnlyReasons: string[] = [];
   if (isOver80) netAssetOnlyReasons.push("부동산 등 비율 80% 이상");
-  if (num(judgment.stockRatioPercent) >= 80) netAssetOnlyReasons.push("주식 등 비율 80% 이상");
+  if (pick(judgment.stockRatioPercent, auto.stockRatioPercent) >= 80) netAssetOnlyReasons.push("주식 등 비율 80% 이상");
   if (judgment.liquidation) netAssetOnlyReasons.push("청산절차 진행 등 사업 계속 곤란");
   if (isUnder3Years) netAssetOnlyReasons.push("사업개시 후 3년 미만");
   if (judgment.dormant) netAssetOnlyReasons.push("사업개시 전 또는 휴업·폐업 중");
@@ -184,6 +243,7 @@ export function calculateValuation(state: ValuationState): ValuationResult {
       liabilityBook,
       liabilityDiff,
       liabilityTaxEtc,
+      declaredPayables,
       liabilityTotal,
       beforeGoodwill,
       goodwillApplied,
@@ -201,6 +261,7 @@ export function calculateValuation(state: ValuationState): ValuationResult {
       value: goodwillValue,
       excluded: goodwillExcluded,
     },
+    auto,
     realEstate: {
       bookAssets: assetBook,
       taxAssets,

@@ -10,7 +10,15 @@ const WEIGHT_LABELS = {
   netAssetOnly: "순자산가치만으로 평가",
 } as const;
 
-export default function ResultStep({ state, result }: { state: ValuationState; result: ValuationResult }) {
+export default function ResultStep({
+  state,
+  result,
+  pending,
+}: {
+  state: ValuationState;
+  result: ValuationResult;
+  pending: number; // 남은 자료 요청·불일치 건수
+}) {
   const { netAsset, netIncome, goodwill, perShare, method } = result;
   const name = state.basic.companyName;
   const floorApplied = perShare.floor > perShare.weighted;
@@ -22,6 +30,11 @@ export default function ResultStep({ state, result }: { state: ValuationState; r
     >
       {!result.ready && (
         <Note tone="warning">발행주식총수를 입력하지 않아 1주당 금액을 계산할 수 없어요. 기본정보 단계에서 입력해 주세요.</Note>
+      )}
+      {pending > 0 && (
+        <Note tone="warning">
+          아직 필요한 자료나 맞지 않는 숫자가 {pending}건 있어요. 검토 사항을 처리하면 더 정확한 평가액이 나와요.
+        </Note>
       )}
 
       <div className="flex flex-col gap-2 rounded-xl bg-zinc-900 p-5 text-white dark:bg-zinc-50 dark:text-zinc-900">
@@ -55,6 +68,9 @@ export default function ResultStep({ state, result }: { state: ValuationState; r
         <ResultRow label="재무상태표상 부채총액" value={formatWon(netAsset.liabilityBook)} />
         <ResultRow label="부채 평가차액" value={formatWon(netAsset.liabilityDiff)} />
         <ResultRow label="법인세 등" value={formatWon(netAsset.liabilityTaxEtc)} />
+        {netAsset.declaredPayables !== 0 && (
+          <ResultRow label="결의된 배당금·상여금 미지급분" value={formatWon(netAsset.declaredPayables)} />
+        )}
         <ResultRow label="나. 부채총계" value={formatWon(netAsset.liabilityTotal)} emphasize />
         <ResultRow label="다. 영업권 포함 전 순자산가액 (가 − 나)" value={formatWon(netAsset.beforeGoodwill)} />
         <ResultRow label="라. 영업권" value={formatWon(netAsset.goodwillApplied)} />

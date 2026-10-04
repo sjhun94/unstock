@@ -8,6 +8,7 @@ import {
   matchPreset,
   num,
   type Account,
+  type SheetInfo,
   type Side,
   type ValuationMethod,
 } from "@/lib/valuation/index.ts";
@@ -21,11 +22,13 @@ export default function BalanceSheetStep({
   valuationDate,
   fiscalYearEndMonth,
   onChange,
+  onSheet,
 }: {
   accounts: Account[];
   valuationDate: string;
   fiscalYearEndMonth: number;
   onChange: (accounts: Account[]) => void;
+  onSheet: (sheet: SheetInfo) => void;
 }) {
   const update = (id: string, patch: Partial<Account>) =>
     onChange(accounts.map((account) => (account.id === id ? { ...account, ...patch } : account)));
@@ -41,6 +44,7 @@ export default function BalanceSheetStep({
         valuationDate={valuationDate}
         fiscalYearEndMonth={fiscalYearEndMonth}
         onChange={onChange}
+        onSheet={onSheet}
       />
 
       {(["asset", "liability"] as Side[]).map((side) => {

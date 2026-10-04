@@ -93,6 +93,7 @@ export const ACCOUNT_PRESETS: AccountPreset[] = [
   { side: "asset", name: "임차보증금", method: "receivable" },
   { side: "asset", name: "이연법인세자산", method: "zero" },
   { side: "asset", name: "사용권자산", method: "zero" },
+  { side: "asset", name: "퇴직연금운용자산", method: "book" },
   { side: "asset", name: "기타 자산", method: "book" },
   { side: "liability", name: "매입채무", method: "unconfirmed" },
   { side: "liability", name: "미지급금", method: "unconfirmed" },
@@ -175,7 +176,7 @@ export function createEmployee(): EmployeeRow {
 }
 
 export function createReserve(): ReserveRow {
-  return { id: newId(), name: "", reserveAmount: "", includeAmount: "" };
+  return { id: newId(), name: "", reserveAmount: "", includeAmount: "", note: "" };
 }
 
 export function emptyNetIncomeYear(): NetIncomeYear {
@@ -205,6 +206,9 @@ export function emptyNetIncomeYear(): NetIncomeYear {
     capitalChangeEffect: "",
     months: "12",
     shares: "",
+    period: "",
+    lossCarryforward: "",
+    adjustmentsPasted: false,
   };
 }
 
@@ -219,7 +223,13 @@ export function createInitialState(): ValuationState {
       fiscalYearEndMonth: "12",
     },
     accounts: [],
-    adjustments: { reserves: [], liabilityTaxEtc: "", purchasedGoodwill: "", capitalizationRatePercent: "10" },
+    adjustments: {
+      reserves: [],
+      liabilityTaxEtc: "",
+      declaredPayables: "",
+      purchasedGoodwill: "",
+      capitalizationRatePercent: "10",
+    },
     netIncome: [emptyNetIncomeYear(), emptyNetIncomeYear(), emptyNetIncomeYear()],
     judgment: {
       stockRatioPercent: "",
@@ -242,5 +252,7 @@ export function createInitialState(): ValuationState {
       liquidationConfirmed: false,
       otherExempt: false,
     },
+    sheet: null,
+    dismissed: [],
   };
 }

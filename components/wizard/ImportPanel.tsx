@@ -8,6 +8,7 @@ import {
   type Account,
   type AmountColumn,
   type ImportResult,
+  type SheetInfo,
   type Side,
 } from "@/lib/valuation/index.ts";
 import { formatWon } from "./ui";
@@ -18,12 +19,14 @@ export default function ImportPanel({
   valuationDate,
   fiscalYearEndMonth,
   onChange,
+  onSheet,
 }: {
   side: Side;
   accounts: Account[];
   valuationDate: string;
   fiscalYearEndMonth: number;
   onChange: (accounts: Account[]) => void;
+  onSheet: (sheet: SheetInfo) => void;
 }) {
   const [text, setText] = useState("");
   const [column, setColumn] = useState<number | null>(null);
@@ -45,6 +48,7 @@ export default function ImportPanel({
     const sides = new Set(parsed.rows.map((row) => row.side));
     const kept = mode === "replace" ? accounts.filter((account) => !sides.has(account.side)) : accounts;
     onChange([...kept, ...imported]);
+    onSheet({ date: selected?.date ?? null, label: selected?.label ?? "", ...parsed.totals });
     const assets = parsed.rows.filter((row) => row.side === "asset").length;
     const liabilities = parsed.rows.length - assets;
     const basis = selected ? ` (기준: ${selected.label})` : "";

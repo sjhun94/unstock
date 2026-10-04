@@ -26,9 +26,17 @@ export type ColumnReason =
   | "first"
   | "manual";
 
+export interface SheetTotals {
+  assetTotal: number | null;
+  liabilityTotal: number | null;
+  equityTotal: number | null;
+  capital: number | null; // 자본금
+}
+
 export interface ImportResult {
   rows: ImportedRow[];
   skipped: number; // 제목·소계·자본 등으로 건너뛴 줄 수
+  totals: SheetTotals; // 검증용 합계 줄
   columns: AmountColumn[]; // 금액 열이 2개 이상일 때만 채워짐
   column: number | null; // 실제로 읽은 열의 index
   reason: ColumnReason | null; // 그 열을 고른 이유
@@ -44,6 +52,7 @@ export interface ParseOptions {
 const RULES: { side: Side; pattern: RegExp; preset: string }[] = [
   { side: "asset", pattern: /이연법인세자산/, preset: "이연법인세자산" },
   { side: "asset", pattern: /사용권자산/, preset: "사용권자산" },
+  { side: "asset", pattern: /퇴직연금운용자산|퇴직보험예치금|국민연금전환금/, preset: "퇴직연금운용자산" },
   { side: "asset", pattern: /현금|예금|단기금융상품|장기금융상품|적금/, preset: "현금및현금성자산" },
   { side: "asset", pattern: /매출채권|외상매출|받을어음/, preset: "매출채권" },
   { side: "asset", pattern: /미수수익/, preset: "미수수익" },
@@ -78,7 +87,9 @@ const RULES: { side: Side; pattern: RegExp; preset: string }[] = [
 ];
 
 // 바로 위 계정에서 빼는 차감 계정
-const CONTRA = /누계액|대손충당금|현재가치할인차금|퇴직연금운용자산|국민연금전환금/;
+const CONTRA = /누계액|대손충당금|현재가치할인차금/;
+// 부채 아래에 차감 형식으로 표시되지만 상증세법상 별도 자산으로 보는 계정 (퇴직금 추계액을 부채로 잡으므로 따로 남겨 둠)
+const PENSION_ASSET = /퇴직연금운용자산|퇴직보험예치금|국민연금전환금/;
 // 금액이 있어도 계정이 아닌 줄 (구분 제목, 소계, 합계)
 const NOT_ACCOUNT = /^(자산|부채|자본|유동자산|비유동자산|당좌자산|투자자산|기타비유동자산|유동부채|비유동부채)$|총계|합계|소계/;
 
@@ -89,7 +100,7 @@ function stripNumbering(text: string) {
     .trim();
 }
 
-function parseAmount(cell: string): number | null {
+export function parseAmount(cell: string): number | null {
   let text = cell.trim();
   if (text === "" || text === "-") return null;
   let negative = false;
@@ -243,6 +254,7 @@ export function parseBalanceSheet(text: string, defaultSide: Side, options: Pars
     }
   }
 
+  const totals: SheetTotals = { assetTotal: null, liabilityTotal: null, equityTotal: null, capital: null };
   for (const cells of lines) {
     const nameIndex = nameIndexOf(cells);
     if (nameIndex < 0) {
@@ -253,6 +265,15 @@ export function parseBalanceSheet(text: string, defaultSide: Side, options: Pars
     let amount: number | null = null;
     if (column !== null) amount = column > nameIndex ? parseAmount(cells[column] ?? "") : null;
     else for (let i = nameIndex + 1; i < cells.length && amount === null; i++) amount = parseAmount(cells[i]);
+
+    if (amount !== null) {
+      if (/부채(와|및)?자본총계/.test(name)) {
+        // 부채와자본총계는 검증에 쓰지 않음
+      } else if (/자산총계/.test(name)) totals.assetTotal = amount;
+      else if (/부채총계/.test(name)) totals.liabilityTotal = amount;
+      else if (/자본총계/.test(name)) totals.equityTotal = amount;
+      else if (name === "자본금" && totals.capital === null) totals.capital = amount;
+    }
 
     const nextSection = sectionOf(name);
     if (nextSection) section = nextSection;
@@ -270,12 +291,13 @@ export function parseBalanceSheet(text: string, defaultSide: Side, options: Pars
       }
     }
 
-    const side: Side = section;
+    // 퇴직연금운용자산 등은 부채 아래 차감 형식으로 있어도 별도 자산으로 둠
+    const side: Side = PENSION_ASSET.test(name) ? "asset" : section;
     const preset = matchPreset(name, side);
-    rows.push({ side, name, amount, method: preset?.method ?? "book" });
+    rows.push({ side, name, amount: side !== section ? Math.abs(amount) : amount, method: preset?.method ?? "book" });
   }
 
-  return { rows, skipped, columns, column, reason };
+  return { rows, skipped, totals, columns, column, reason };
 }
 
 export function rowsToAccounts(rows: ImportedRow[]): Account[] {

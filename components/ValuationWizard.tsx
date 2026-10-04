@@ -5,9 +5,12 @@ import {
   calculateValuation,
   createInitialState,
   num,
+  reviewValuation,
   type NetIncomeYear,
+  type ReviewStep,
   type ValuationState,
 } from "@/lib/valuation/index.ts";
+import ReviewPanel from "@/components/wizard/ReviewPanel";
 import BalanceSheetStep from "@/components/wizard/BalanceSheetStep";
 import EvaluationStep from "@/components/wizard/EvaluationStep";
 import AdjustmentsStep from "@/components/wizard/AdjustmentsStep";
@@ -18,6 +21,15 @@ import ResultStep from "@/components/wizard/ResultStep";
 import { formatWon } from "@/components/wizard/ui";
 
 const STEPS = ["기본정보", "재무상태표", "자산 평가", "부채 평가", "유보·조정", "순손익액", "평가방법", "결과"] as const;
+const STEP_INDEX: Record<ReviewStep, number> = {
+  basic: 0,
+  balanceSheet: 1,
+  assets: 2,
+  liabilities: 3,
+  adjustments: 4,
+  netIncome: 5,
+  judgment: 6,
+};
 
 export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?: () => void }) {
   const [step, setStep] = useState(0);
@@ -29,6 +41,16 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
     valuationDate: state.basic.valuationDate,
     fiscalYearEndMonth: num(state.basic.fiscalYearEndMonth) || 12,
   };
+
+  const review = reviewValuation(state, result);
+  const pending = review.filter((item) => item.level === "request" || item.level === "mismatch").length;
+  const reviewPanel = (
+    <ReviewPanel
+      items={review}
+      onJump={(target) => setStep(STEP_INDEX[target])}
+      onDismiss={(id) => setState((prev) => ({ ...prev, dismissed: [...prev.dismissed, id] }))}
+    />
+  );
 
   const isResultStep = step === STEPS.length - 1;
 
@@ -57,7 +79,7 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
 
   return (
     <div className="flex w-full max-w-5xl flex-col gap-8 sm:flex-row">
-      <div className="flex shrink-0 flex-col gap-6 sm:w-48">
+      <div className="flex shrink-0 flex-col gap-6 sm:w-64">
         <Timeline step={step} onJump={setStep} />
         {result.ready && (
           <div className="hidden flex-col gap-1 rounded-xl border border-zinc-200 p-3 sm:flex dark:border-zinc-800">
@@ -67,6 +89,7 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
             </span>
           </div>
         )}
+        <div className="hidden sm:block">{reviewPanel}</div>
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-8 rounded-2xl border border-black/10 bg-white p-6 shadow-sm sm:p-8 dark:border-white/10 dark:bg-zinc-950">
@@ -77,6 +100,7 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
             valuationDate={context.valuationDate}
             fiscalYearEndMonth={context.fiscalYearEndMonth}
             onChange={(accounts) => setState((prev) => ({ ...prev, accounts }))}
+            onSheet={(sheet) => setState((prev) => ({ ...prev, sheet }))}
           />
         )}
         {(step === 2 || step === 3) && (
@@ -90,20 +114,26 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
           />
         )}
         {step === 4 && (
-          <AdjustmentsStep value={state.adjustments} onChange={(adjustments) => setState((prev) => ({ ...prev, adjustments }))} />
+          <AdjustmentsStep
+            value={state.adjustments}
+            accounts={state.accounts}
+            onChange={(adjustments) => setState((prev) => ({ ...prev, adjustments }))}
+          />
         )}
         {step === 5 && (
           <NetIncomeStep
             years={state.netIncome}
             results={result.netIncome.years}
             totalShares={state.basic.totalShares}
+            valuationDate={context.valuationDate}
+            fiscalYearEndMonth={context.fiscalYearEndMonth}
             onChange={setNetIncomeYear}
           />
         )}
         {step === 6 && (
           <JudgmentStep value={state.judgment} result={result} onChange={(judgment) => setState((prev) => ({ ...prev, judgment }))} />
         )}
-        {isResultStep && <ResultStep state={state} result={result} />}
+        {isResultStep && <ResultStep state={state} result={result} pending={pending} />}
 
         <div className="flex items-center justify-between pt-2">
           <button type="button" onClick={goBack} className="btn-secondary">
@@ -120,6 +150,8 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
           )}
         </div>
       </div>
+
+      <div className="sm:hidden">{reviewPanel}</div>
     </div>
   );
 }

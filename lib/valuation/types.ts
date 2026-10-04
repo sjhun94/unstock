@@ -110,6 +110,7 @@ export interface ReserveRow {
   name: string;
   reserveAmount: string; // 유보금액
   includeAmount: string; // 그중 순자산에 가감할 금액
+  note: string; // 붙여넣기 때 자동으로 정한 이유 (예: "토지를 기준시가로 다시 평가해서 제외")
 }
 
 export type NetIncomeTaxMode = "direct" | "computed";
@@ -145,6 +146,10 @@ export interface NetIncomeYear {
   capitalChangeEffect: string; // 유상증자·감자 효과
   months: string; // 사업연도 월수 (연환산용)
   shares: string; // 사업연도말 주식수 (비우면 발행주식총수)
+  // 붙여넣은 신고서 정보 (검토용)
+  period: string; // 사업연도 (예: "2023-01-01 ~ 2023-12-31")
+  lossCarryforward: string; // 이월결손금 공제액 (있으면 공제 전 세액으로 다시 계산)
+  adjustmentsPasted: boolean; // 소득금액조정합계표를 붙여넣었는지
 }
 
 export interface BasicInfo {
@@ -159,6 +164,7 @@ export interface BasicInfo {
 export interface Adjustments {
   reserves: ReserveRow[]; // 세무상 유보금액 명세
   liabilityTaxEtc: string; // 부채에 가산할 법인세 등 (재무제표 미반영분)
+  declaredPayables: string; // 평가기준일 전에 결의한 배당금·상여금 등 미지급분 (재무제표 미반영분)
   purchasedGoodwill: string; // 매입한 무체재산권으로서 영업권 평가액
   capitalizationRatePercent: string; // 순손익가치 환원율(%)
 }
@@ -188,10 +194,22 @@ export interface Judgment {
   otherExempt: boolean; // 그 밖의 할증 제외 사유
 }
 
+// 붙여넣은 재무상태표에서 읽은 합계·자본금 (검토용)
+export interface SheetInfo {
+  date: string | null; // 사용한 열의 기준일
+  label: string; // 사용한 열의 머리글
+  assetTotal: number | null; // 자산총계
+  liabilityTotal: number | null; // 부채총계
+  equityTotal: number | null; // 자본총계
+  capital: number | null; // 자본금
+}
+
 export interface ValuationState {
   basic: BasicInfo;
   accounts: Account[];
   adjustments: Adjustments;
   netIncome: [NetIncomeYear, NetIncomeYear, NetIncomeYear]; // [1년 전, 2년 전, 3년 전]
   judgment: Judgment;
+  sheet: SheetInfo | null;
+  dismissed: string[]; // 검토 사항 중 "확인했어요"로 닫은 항목
 }
