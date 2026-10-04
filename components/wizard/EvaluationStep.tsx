@@ -14,6 +14,7 @@ import {
   type ValuationMethod,
 } from "@/lib/valuation/index.ts";
 import { CorporateTaxEditor, EmployeesEditor, FixedAssetsEditor, UnconfirmedEditor, type EditorContext } from "./editors";
+import LandPriceLookup from "./LandPriceLookup";
 import { Checkbox, DateInput, MiniField, Note, NumberInput, ResultRow, StepSection, formatWon } from "./ui";
 
 const SIDE_TEXT: Record<Side, { title: string; description: string; empty: string }> = {
@@ -252,6 +253,14 @@ function AccountCard({
             {field("시가 (매매·감정·수용가액 등)", "marketValue", "없으면 비워두세요")}
             {field("기준시가 (개별공시지가 등)", "standardValue")}
           </div>
+          {/토지|대지|임야|전답/.test(account.name) && (
+            <LandPriceLookup
+              valuationDate={context.valuationDate}
+              onApply={(value, mode) =>
+                onChange({ standardValue: String(mode === "add" ? num(account.standardValue) + value : value) })
+              }
+            />
+          )}
           <Checkbox checked={account.justifiedBelowBook} onChange={(justifiedBelowBook) => onChange({ justifiedBelowBook })}>
             장부가액보다 작게 평가할 정당한 사유가 있습니다
           </Checkbox>
