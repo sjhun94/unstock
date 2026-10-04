@@ -20,62 +20,94 @@ export function newId(): string {
 }
 
 export const METHOD_LABELS: Record<ValuationMethod, string> = {
+  deposit: "예금",
+  receivable: "채권",
+  realEstate: "토지·건물",
+  listedStock: "상장주식",
+  manual: "비상장주식 등",
+  depreciation: "감가상각자산",
+  inventory: "재고자산",
+  prepaidExpense: "선급비용",
+  unconfirmed: "확정 채무",
+  borrowing: "차입금",
+  provision: "충당부채·미지급비용",
+  corporateTax: "법인세",
+  severance: "퇴직급여",
+  zero: "0원 처리",
   book: "장부가액 그대로",
-  manual: "평가액 직접 입력",
-  zero: "0원 (세무상 인정되지 않음)",
-  deposit: "예금 (미수이자 − 원천징수세액 반영)",
-  depreciation: "감가상각 세무상 재계산",
-  unconfirmed: "미확정 부채 차감",
-  corporateTax: "법인세 등 납부할 세액 계산",
-  severance: "퇴직급여 추계액",
 };
 
+// 유형별 평가 원칙 (화면 안내 문구)
+export const METHOD_DESCRIPTIONS: Record<ValuationMethod, string> = {
+  deposit: "예입총액에 평가기준일까지의 미수이자를 더하고 원천징수세액을 뺀 금액으로 평가합니다.",
+  receivable:
+    "회수기간이 5년 이내면 장부가액으로, 5년을 넘으면 현재가치로 평가합니다. 평가기준일 현재 회수할 수 없는 금액은 빼세요.",
+  realEstate:
+    "시가로 평가하고, 시가가 없으면 기준시가(공시지가·기준시가)로 평가합니다. 그 금액이 장부가액보다 작으면 장부가액으로 합니다(정당한 사유가 있으면 예외).",
+  listedStock: "평가기준일 전후 각 2개월간 최종시세가액의 평균액에 보유 주식 수를 곱해 평가합니다.",
+  manual: "비상장주식·출자금 등은 해당 법인을 따로 평가한 금액을 입력하세요.",
+  depreciation: "자산별로 세법상 상각방법에 따라 다시 계산한 장부가액으로 평가합니다.",
+  inventory: "처분할 때 받을 수 있는 예상가액으로 평가하고, 알 수 없으면 장부가액으로 합니다.",
+  prepaidExpense: "평가기준일 현재 비용으로 확정된 금액은 자산에서 뺍니다.",
+  unconfirmed: "평가기준일 현재 지급의무가 확정된 금액만 부채로 인정합니다. 확정되지 않은 금액을 적어 빼세요.",
+  borrowing: "원금에 평가기준일까지 발생한 미지급이자를 더한 금액으로 평가합니다.",
+  provision: "충당부채·미지급비용 중 평가기준일 현재 지급의무가 확정된 금액만 부채로 인정합니다.",
+  corporateTax: "평가기준일까지 발생한 소득에 대해 실제로 납부해야 할 법인세·지방소득세·농어촌특별세로 평가합니다.",
+  severance:
+    "평가기준일 현재 임직원 전원이 퇴직할 경우 지급할 퇴직금 추계액으로 평가합니다. 확정기여형(DC) 가입자는 제외합니다.",
+  zero: "이연법인세·사용권자산·리스부채처럼 세무상 인정되지 않는 자산·부채는 0원으로 평가합니다.",
+  book: "장부가액을 상증세법상 평가액으로 봅니다. 다르게 평가해야 하면 평가액을 직접 입력하세요.",
+};
+
+// 화면에 보여줄 순서 (입력이 필요한 유형 먼저, 0원·그대로는 마지막)
 export const METHODS_BY_SIDE: Record<Side, ValuationMethod[]> = {
-  asset: ["book", "manual", "zero", "deposit", "depreciation"],
-  liability: ["book", "manual", "zero", "unconfirmed", "corporateTax", "severance"],
+  asset: ["deposit", "receivable", "realEstate", "listedStock", "manual", "depreciation", "inventory", "prepaidExpense", "zero", "book"],
+  liability: ["unconfirmed", "borrowing", "provision", "corporateTax", "severance", "zero", "book"],
 };
 
 export interface AccountPreset {
   side: Side;
   name: string;
   method: ValuationMethod;
-  hint: string; // 평가 원칙 요약
 }
 
+// "계정 추가"에서 고를 수 있는 대표 계정과 기본 평가 유형
 export const ACCOUNT_PRESETS: AccountPreset[] = [
-  { side: "asset", name: "현금및현금성자산", method: "deposit", hint: "예입총액에 평가기준일까지의 미수이자를 더하고 원천징수세액을 뺍니다." },
-  { side: "asset", name: "매출채권", method: "book", hint: "회수기간 5년 이내이면 장부가액. 회수 불가능한 금액은 직접 입력으로 제외하세요." },
-  { side: "asset", name: "미수금", method: "book", hint: "회수기간 5년 이내이면 장부가액으로 평가합니다." },
-  { side: "asset", name: "미수수익", method: "manual", hint: "평가기준일까지 발생한 이자 상당액으로 평가합니다." },
-  { side: "asset", name: "선급금", method: "book", hint: "회수기간 5년 이내이면 장부가액으로 평가합니다." },
-  { side: "asset", name: "선급비용", method: "book", hint: "평가기준일 현재 비용으로 확정된 금액은 자산에서 제외합니다." },
-  { side: "asset", name: "선급법인세", method: "manual", hint: "미지급법인세 계산에 반영했다면 0으로 평가합니다." },
-  { side: "asset", name: "계약자산", method: "book", hint: "세무조정과 일치하도록 평가합니다." },
-  { side: "asset", name: "재고자산", method: "book", hint: "처분 예상가액을 알기 어려우면 장부가액으로 평가합니다." },
-  { side: "asset", name: "금융자산(주식 등)", method: "manual", hint: "상장주식은 평가기준일 전후 2개월 종가평균 등으로 별도 평가합니다." },
-  { side: "asset", name: "토지", method: "manual", hint: "시가 또는 기준시가(개별공시지가)로 평가하되, 장부가액보다 작으면 장부가액으로 합니다." },
-  { side: "asset", name: "건물", method: "manual", hint: "시가 또는 기준시가로 평가하되, 장부가액보다 작으면 장부가액으로 합니다." },
-  { side: "asset", name: "유형자산(비품 등)", method: "depreciation", hint: "장부금액은 취득가액에서 감가상각누계액을 뺀 금액. 자산별로 세법상 상각방법으로 다시 계산합니다." },
-  { side: "asset", name: "무형자산(소프트웨어 등)", method: "depreciation", hint: "자산별로 세법상 상각방법으로 다시 계산한 장부가액으로 평가합니다." },
-  { side: "asset", name: "임차보증금", method: "book", hint: "회수기간 5년 이내이면 장부가액으로 평가합니다." },
-  { side: "asset", name: "이연법인세자산", method: "zero", hint: "세무상 자산으로 인정되지 않아 0으로 평가합니다." },
-  { side: "asset", name: "사용권자산", method: "zero", hint: "세무상 부인되는 자산이라 0으로 평가합니다." },
-  { side: "asset", name: "기타 자산", method: "book", hint: "평가방법을 선택하세요." },
-  { side: "liability", name: "미지급금", method: "unconfirmed", hint: "평가기준일 현재 확정된 부채만 인정합니다. 확정되지 않은 금액을 명세에 적어 차감하세요." },
-  { side: "liability", name: "미지급비용", method: "manual", hint: "연차충당부채처럼 확정되지 않은 부채는 제외한 금액을 입력합니다." },
-  { side: "liability", name: "예수금", method: "book", hint: "장부가액으로 평가합니다." },
-  { side: "liability", name: "부가세예수금", method: "book", hint: "장부가액으로 평가합니다." },
-  { side: "liability", name: "당기법인세부채", method: "corporateTax", hint: "평가기준일까지 발생한 소득에 대해 실제 납부해야 할 법인세·지방소득세·농어촌특별세로 평가합니다." },
-  { side: "liability", name: "차입금", method: "book", hint: "원금에 평가기준일까지의 미지급이자를 더한 금액으로 평가합니다." },
-  { side: "liability", name: "선수금·계약부채", method: "book", hint: "장부가액으로 평가합니다." },
-  { side: "liability", name: "충당부채", method: "manual", hint: "확정된 부채만 인정합니다. 충당금·준비금은 원칙적으로 부채에서 제외합니다." },
-  { side: "liability", name: "퇴직급여충당부채", method: "severance", hint: "임직원 전원이 퇴직할 경우 지급할 퇴직금 추계액으로 평가합니다. 확정기여형(DC)은 추계액이 없습니다." },
-  { side: "liability", name: "장기미지급금", method: "manual", hint: "확정되지 않은 부채는 제외한 금액을 입력합니다." },
-  { side: "liability", name: "리스부채", method: "zero", hint: "세무상 부인되는 부채라 0으로 평가합니다." },
-  { side: "liability", name: "이연법인세부채", method: "zero", hint: "세무상 부채로 인정되지 않아 0으로 평가합니다." },
-  { side: "liability", name: "기타 부채", method: "book", hint: "평가방법을 선택하세요." },
+  { side: "asset", name: "현금및현금성자산", method: "deposit" },
+  { side: "asset", name: "매출채권", method: "receivable" },
+  { side: "asset", name: "미수금", method: "receivable" },
+  { side: "asset", name: "대여금", method: "receivable" },
+  { side: "asset", name: "미수수익", method: "book" },
+  { side: "asset", name: "선급금", method: "book" },
+  { side: "asset", name: "선급비용", method: "prepaidExpense" },
+  { side: "asset", name: "선급법인세", method: "book" },
+  { side: "asset", name: "계약자산", method: "book" },
+  { side: "asset", name: "재고자산", method: "inventory" },
+  { side: "asset", name: "상장주식", method: "listedStock" },
+  { side: "asset", name: "비상장주식·출자금", method: "manual" },
+  { side: "asset", name: "토지", method: "realEstate" },
+  { side: "asset", name: "건물", method: "realEstate" },
+  { side: "asset", name: "유형자산(비품 등)", method: "depreciation" },
+  { side: "asset", name: "무형자산(소프트웨어 등)", method: "depreciation" },
+  { side: "asset", name: "임차보증금", method: "receivable" },
+  { side: "asset", name: "이연법인세자산", method: "zero" },
+  { side: "asset", name: "사용권자산", method: "zero" },
+  { side: "asset", name: "기타 자산", method: "book" },
+  { side: "liability", name: "매입채무", method: "unconfirmed" },
+  { side: "liability", name: "미지급금", method: "unconfirmed" },
+  { side: "liability", name: "미지급비용", method: "provision" },
+  { side: "liability", name: "예수금", method: "book" },
+  { side: "liability", name: "부가세예수금", method: "book" },
+  { side: "liability", name: "당기법인세부채", method: "corporateTax" },
+  { side: "liability", name: "차입금", method: "borrowing" },
+  { side: "liability", name: "선수금·계약부채", method: "book" },
+  { side: "liability", name: "충당부채", method: "provision" },
+  { side: "liability", name: "퇴직급여충당부채", method: "severance" },
+  { side: "liability", name: "장기미지급금", method: "provision" },
+  { side: "liability", name: "리스부채", method: "zero" },
+  { side: "liability", name: "이연법인세부채", method: "zero" },
+  { side: "liability", name: "기타 부채", method: "book" },
 ];
-
 
 export function emptyCorporateTax(): CorporateTaxInput {
   return {
@@ -103,7 +135,18 @@ export function createAccount(side: Side, name: string, method: ValuationMethod)
     method,
     manualValue: "",
     accruedInterest: "",
-    withholdingRatePercent: "14",
+    withholdingTax: "",
+    uncollectible: "",
+    over5Years: false,
+    presentValue: "",
+    marketValue: "",
+    standardValue: "",
+    justifiedBelowBook: false,
+    avgPrice: "",
+    shareCount: "",
+    disposalValue: "",
+    expensedAmount: "",
+    confirmedAmount: "",
     fixedAssets: [],
     unconfirmed: [],
     corporateTax: emptyCorporateTax(),

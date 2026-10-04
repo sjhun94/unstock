@@ -3,16 +3,26 @@
 
 export type Side = "asset" | "liability";
 
-// 계정과목별 "상증세법상 평가액"을 구하는 방법
+// 계정과목의 평가 유형 — 유형마다 입력받는 값과 상증세법상 평가액 계산식이 다릅니다.
 export type ValuationMethod =
-  | "book" // 장부가액 그대로
-  | "manual" // 평가액 직접 입력
-  | "zero" // 세무상 인정되지 않는 자산·부채 (0원)
+  // 자산
   | "deposit" // 예금: 장부가액 + 미수이자 − 원천징수세액
-  | "depreciation" // 감가상각 세무상 재계산 (자산 명세)
-  | "unconfirmed" // 확정되지 않은 부채 차감 (부채 명세)
-  | "corporateTax" // 평가기준일까지의 법인세 등 납부할 세액 계산
-  | "severance"; // 퇴직급여 추계액 (직원 명세)
+  | "receivable" // 채권: 장부가액 − 회수불능액 (회수기간 5년 초과 시 현재가치)
+  | "realEstate" // 토지·건물: 시가 → 기준시가, 장부가액보다 작으면 장부가액
+  | "listedStock" // 상장주식: 평가기준일 전후 2개월 종가평균 × 주식 수
+  | "manual" // 비상장주식 등: 별도 평가액 입력
+  | "depreciation" // 감가상각자산: 자산별 세법상 재계산
+  | "inventory" // 재고자산: 처분 예상가액 (없으면 장부가액)
+  | "prepaidExpense" // 선급비용: 비용으로 확정된 금액 제외
+  // 부채
+  | "unconfirmed" // 확정 채무: 확정되지 않은 금액 차감
+  | "borrowing" // 차입금: 장부가액 + 평가기준일까지의 미지급이자
+  | "provision" // 충당부채·미지급비용: 확정된 금액만
+  | "corporateTax" // 법인세: 평가기준일까지의 납부할 세액 계산
+  | "severance" // 퇴직급여: 일시퇴직 기준 추계액
+  // 공통
+  | "zero" // 세무상 인정되지 않음 (0원)
+  | "book"; // 장부가액 그대로 (필요하면 평가액 직접 입력)
 
 export type DepreciationMethod = "declining" | "straight"; // 정률법 | 정액법
 
@@ -72,9 +82,20 @@ export interface Account {
   name: string;
   bookValue: string; // 재무상태표상 금액
   method: ValuationMethod;
-  manualValue: string; // method = manual
-  accruedInterest: string; // method = deposit: 평가기준일까지의 미수이자
-  withholdingRatePercent: string; // method = deposit: 원천징수세율(%)
+  manualValue: string; // manual: 평가액 / book: 평가액 직접 입력(비우면 장부가액)
+  accruedInterest: string; // deposit: 미수이자 / borrowing: 미지급이자
+  withholdingTax: string; // deposit: 원천징수세액
+  uncollectible: string; // receivable: 회수 불가능한 금액
+  over5Years: boolean; // receivable: 회수기간 5년 초과
+  presentValue: string; // receivable: 회수기간 5년 초과 시 현재가치
+  marketValue: string; // realEstate: 시가
+  standardValue: string; // realEstate: 기준시가
+  justifiedBelowBook: boolean; // realEstate: 장부가액보다 작게 평가할 정당한 사유
+  avgPrice: string; // listedStock: 평가기준일 전후 2개월 종가 평균
+  shareCount: string; // listedStock: 보유 주식 수
+  disposalValue: string; // inventory: 처분 예상가액
+  expensedAmount: string; // prepaidExpense: 비용으로 확정된 금액
+  confirmedAmount: string; // provision: 평가기준일 현재 확정된 금액
   fixedAssets: FixedAssetRow[]; // method = depreciation
   unconfirmed: UnconfirmedRow[]; // method = unconfirmed
   corporateTax: CorporateTaxInput; // method = corporateTax

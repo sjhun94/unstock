@@ -13,8 +13,11 @@ import {
   fixedAssetTaxValue,
   netIncomeYear,
   newId,
+  type Account,
   type CorporateTaxInput,
   type FixedAssetRow,
+  type Side,
+  type ValuationMethod,
   type ValuationState,
 } from "./index.ts";
 
@@ -129,7 +132,7 @@ test("순손익액: 12개월 미만 사업연도 연환산", () => {
 const CONTEXT = { valuationDate: "2024-09-30", fiscalYearEndMonth: 12 };
 
 test("계정 평가방법별 평가액", () => {
-  const deposit = { ...createAccount("asset", "예금", "deposit"), bookValue: "200000000", accruedInterest: "1000000" };
+  const deposit = { ...createAccount("asset", "예금", "deposit"), bookValue: "200000000", accruedInterest: "1000000", withholdingTax: "140000" };
   assert.equal(accountValue(deposit, CONTEXT).taxValue, 200_860_000); // + 1,000,000 − 140,000
 
   const zero = { ...createAccount("asset", "이연법인세자산", "zero"), bookValue: "50000000" };
@@ -261,4 +264,40 @@ test("가중평균이 순자산가치의 80%에 못 미치면 80%를 적용", ()
   // 순손익가치 10,000 / 순자산가치 100,000(영업권 음수 → 0) → 가중 46,000 < 하한 80,000
   assert.equal(result.perShare.weighted, 46_000);
   assert.equal(result.perShare.final, 80_000);
+});
+
+test("새 평가 유형별 평가액", () => {
+  const make = (side: Side, method: ValuationMethod, book: string, extra: Partial<Account>): Account => ({
+    ...createAccount(side, "계정", method),
+    bookValue: book,
+    ...extra,
+  });
+  const v = (account: Account) => accountValue(account, CONTEXT);
+
+  // 채권: 회수불능액 차감 / 5년 초과면 현재가치 기준
+  assert.equal(v(make("asset", "receivable", "1000000", { uncollectible: "200000" })).taxValue, 800000);
+  assert.equal(v(make("asset", "receivable", "1000000", { over5Years: true, presentValue: "700000" })).taxValue, 700000);
+  assert.equal(v(make("asset", "receivable", "1000000", { over5Years: true })).fallbackToBook, true);
+
+  // 토지·건물: 시가 우선 → 기준시가 → 장부가액보다 작으면 장부가액
+  assert.equal(v(make("asset", "realEstate", "500", { marketValue: "900", standardValue: "600" })).taxValue, 900);
+  assert.equal(v(make("asset", "realEstate", "500", { standardValue: "600" })).taxValue, 600);
+  assert.equal(v(make("asset", "realEstate", "500", { standardValue: "400" })).taxValue, 500);
+  assert.equal(v(make("asset", "realEstate", "500", { standardValue: "400", justifiedBelowBook: true })).taxValue, 400);
+  assert.equal(v(make("asset", "realEstate", "500", {})).fallbackToBook, true);
+
+  // 상장주식, 재고자산, 선급비용
+  assert.equal(v(make("asset", "listedStock", "0", { avgPrice: "12500", shareCount: "100" })).taxValue, 1250000);
+  assert.equal(v(make("asset", "inventory", "800", {})).taxValue, 800);
+  assert.equal(v(make("asset", "inventory", "800", { disposalValue: "650" })).taxValue, 650);
+  assert.equal(v(make("asset", "prepaidExpense", "300", { expensedAmount: "120" })).taxValue, 180);
+
+  // 차입금: 미지급이자 가산 / 충당부채: 확정분만 (비우면 장부가액 + 경고)
+  assert.equal(v(make("liability", "borrowing", "10000", { accruedInterest: "250" })).taxValue, 10250);
+  assert.equal(v(make("liability", "provision", "5000", { confirmedAmount: "0" })).taxValue, 0);
+  assert.equal(v(make("liability", "provision", "5000", {})).fallbackToBook, true);
+
+  // 장부가액 그대로: 평가액을 직접 넣으면 그 값 사용
+  assert.equal(v(make("asset", "book", "100", {})).taxValue, 100);
+  assert.equal(v(make("asset", "book", "100", { manualValue: "90" })).taxValue, 90);
 });

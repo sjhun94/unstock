@@ -8,7 +8,8 @@ import {
   type NetIncomeYear,
   type ValuationState,
 } from "@/lib/valuation/index.ts";
-import AccountsStep from "@/components/wizard/AccountsStep";
+import BalanceSheetStep from "@/components/wizard/BalanceSheetStep";
+import EvaluationStep from "@/components/wizard/EvaluationStep";
 import AdjustmentsStep from "@/components/wizard/AdjustmentsStep";
 import BasicInfoStep from "@/components/wizard/BasicInfoStep";
 import JudgmentStep from "@/components/wizard/JudgmentStep";
@@ -16,7 +17,7 @@ import NetIncomeStep from "@/components/wizard/NetIncomeStep";
 import ResultStep from "@/components/wizard/ResultStep";
 import { formatWon } from "@/components/wizard/ui";
 
-const STEPS = ["기본정보", "자산", "부채", "유보·조정", "순손익액", "평가방법", "결과"] as const;
+const STEPS = ["기본정보", "재무상태표", "자산 평가", "부채 평가", "유보·조정", "순손익액", "평가방법", "결과"] as const;
 
 export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?: () => void }) {
   const [step, setStep] = useState(0);
@@ -70,20 +71,23 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
 
       <div className="flex min-w-0 flex-1 flex-col gap-8 rounded-2xl border border-black/10 bg-white p-6 shadow-sm sm:p-8 dark:border-white/10 dark:bg-zinc-950">
         {step === 0 && <BasicInfoStep value={state.basic} onChange={(basic) => setState((prev) => ({ ...prev, basic }))} />}
-        {(step === 1 || step === 2) && (
-          <AccountsStep
+        {step === 1 && (
+          <BalanceSheetStep accounts={state.accounts} onChange={(accounts) => setState((prev) => ({ ...prev, accounts }))} />
+        )}
+        {(step === 2 || step === 3) && (
+          <EvaluationStep
             key={step}
-            side={step === 1 ? "asset" : "liability"}
+            side={step === 2 ? "asset" : "liability"}
             accounts={state.accounts}
             values={values}
             context={context}
             onChange={(accounts) => setState((prev) => ({ ...prev, accounts }))}
           />
         )}
-        {step === 3 && (
+        {step === 4 && (
           <AdjustmentsStep value={state.adjustments} onChange={(adjustments) => setState((prev) => ({ ...prev, adjustments }))} />
         )}
-        {step === 4 && (
+        {step === 5 && (
           <NetIncomeStep
             years={state.netIncome}
             results={result.netIncome.years}
@@ -91,7 +95,7 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
             onChange={setNetIncomeYear}
           />
         )}
-        {step === 5 && (
+        {step === 6 && (
           <JudgmentStep value={state.judgment} result={result} onChange={(judgment) => setState((prev) => ({ ...prev, judgment }))} />
         )}
         {isResultStep && <ResultStep state={state} result={result} />}

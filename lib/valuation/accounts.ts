@@ -13,7 +13,8 @@ export interface AccountValue {
   book: number; // 재무상태표상 금액
   taxValue: number; // 상증세법상 평가액
   diff: number; // 평가차액
-  fallbackToBook: boolean; // 명세가 비어 있어 장부가액으로 평가했는지
+  fallbackToBook: boolean; // 필요한 값이 비어 있어 장부가액으로 평가했는지
+  note?: string; // 어떤 기준이 적용됐는지 (예: "기준시가가 장부가액보다 작아 장부가액 적용")
 }
 
 // 일시퇴직기준 추계액 = (최근 3개월 평균급여 + 연간 상여 ÷ 12) × 근속연수
@@ -26,49 +27,78 @@ export function severanceEstimate(employee: EmployeeRow, valuationDate: string):
   return (monthlyWage + num(employee.annualBonus) / 12) * years;
 }
 
-function taxValueOf(account: Account, book: number, context: AccountContext): { value: number; fallback: boolean } {
+const filled = (value: string) => value.trim() !== "";
+
+interface TaxValue {
+  value: number;
+  fallback?: boolean;
+  note?: string;
+}
+
+// 토지·건물: 시가 → 없으면 기준시가 → 그 금액이 장부가액보다 작으면 장부가액 (정당한 사유가 있으면 예외)
+function realEstateValue(account: Account, book: number): TaxValue {
+  const basis = filled(account.marketValue) ? "시가" : filled(account.standardValue) ? "기준시가" : null;
+  if (!basis) return { value: book, fallback: true };
+  const assessed = num(basis === "시가" ? account.marketValue : account.standardValue);
+  if (assessed < book && !account.justifiedBelowBook) {
+    return { value: book, note: `${basis}가 장부가액보다 작아 장부가액을 적용했습니다.` };
+  }
+  return { value: assessed, note: `${basis}를 적용했습니다.` };
+}
+
+function taxValueOf(account: Account, book: number, context: AccountContext): TaxValue {
   switch (account.method) {
-    case "book":
-      return { value: book, fallback: false };
+    case "deposit":
+      return { value: book + num(account.accruedInterest) - num(account.withholdingTax) };
+    case "receivable":
+      if (account.over5Years) {
+        if (!filled(account.presentValue)) return { value: book - num(account.uncollectible), fallback: true };
+        return { value: num(account.presentValue) - num(account.uncollectible) };
+      }
+      return { value: book - num(account.uncollectible) };
+    case "realEstate":
+      return realEstateValue(account, book);
+    case "listedStock":
+      if (!filled(account.avgPrice) || !filled(account.shareCount)) return { value: book, fallback: true };
+      return { value: num(account.avgPrice) * num(account.shareCount) };
     case "manual":
-      return { value: num(account.manualValue), fallback: false };
-    case "zero":
-      return { value: 0, fallback: false };
-    case "deposit": {
-      const accrued = num(account.accruedInterest);
-      const withholding = Math.trunc(accrued * (num(account.withholdingRatePercent) / 100));
-      return { value: book + accrued - withholding, fallback: false };
-    }
+      if (!filled(account.manualValue)) return { value: book, fallback: true };
+      return { value: num(account.manualValue) };
     case "depreciation": {
       if (account.fixedAssets.length === 0) return { value: book, fallback: true };
       const total = account.fixedAssets.reduce(
-        (sum, asset) =>
-          sum + fixedAssetTaxValue(asset, context.valuationDate, context.fiscalYearEndMonth).taxBookValue,
+        (sum, asset) => sum + fixedAssetTaxValue(asset, context.valuationDate, context.fiscalYearEndMonth).taxBookValue,
         0,
       );
-      return { value: total, fallback: false };
+      return { value: total };
     }
-    case "unconfirmed": {
-      const excluded = account.unconfirmed.reduce((sum, row) => sum + num(row.amount), 0);
-      return { value: book - excluded, fallback: false };
-    }
-    case "corporateTax": {
+    case "inventory":
+      return filled(account.disposalValue) ? { value: num(account.disposalValue) } : { value: book };
+    case "prepaidExpense":
+      return { value: book - num(account.expensedAmount) };
+    case "unconfirmed":
+      return { value: book - account.unconfirmed.reduce((sum, row) => sum + num(row.amount), 0) };
+    case "borrowing":
+      return { value: book + num(account.accruedInterest) };
+    case "provision":
+      if (!filled(account.confirmedAmount)) return { value: book, fallback: true };
+      return { value: num(account.confirmedAmount) };
+    case "corporateTax":
       if (isCorporateTaxEmpty(account.corporateTax)) return { value: book, fallback: true };
-      return { value: corporateTaxPayable(account.corporateTax).totalPayable, fallback: false };
-    }
+      return { value: corporateTaxPayable(account.corporateTax).totalPayable };
     case "severance": {
       if (account.employees.length === 0) return { value: book, fallback: true };
-      const total = account.employees.reduce(
-        (sum, employee) => sum + severanceEstimate(employee, context.valuationDate),
-        0,
-      );
-      return { value: total, fallback: false };
+      return { value: account.employees.reduce((sum, e) => sum + severanceEstimate(e, context.valuationDate), 0) };
     }
+    case "zero":
+      return { value: 0 };
+    case "book":
+      return filled(account.manualValue) ? { value: num(account.manualValue) } : { value: book };
   }
 }
 
 export function accountValue(account: Account, context: AccountContext): AccountValue {
   const book = num(account.bookValue);
-  const { value, fallback } = taxValueOf(account, book, context);
-  return { book, taxValue: value, diff: value - book, fallbackToBook: fallback };
+  const { value, fallback = false, note } = taxValueOf(account, book, context);
+  return { book, taxValue: value, diff: value - book, fallbackToBook: fallback, note };
 }

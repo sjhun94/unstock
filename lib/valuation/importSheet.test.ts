@@ -1,7 +1,7 @@
 // 실행: node --test lib/valuation/importSheet.test.ts  (가상의 숫자)
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseBalanceSheet, rowsToAccounts } from "./index.ts";
+import { parseBalanceSheet, parseDateCell, parseEmployees, parseFixedAssets, rowsToAccounts } from "./index.ts";
 
 const SHEET = [
   "과목\t당기\t전기",
@@ -36,12 +36,12 @@ test("재무상태표 붙여넣기: 자산·부채 구분, 차감계정 합산, 
   const summary = rows.map((r) => `${r.side}:${r.name}:${r.amount}:${r.method}`);
   assert.deepEqual(summary, [
     "asset:보통예금:200000:deposit",
-    "asset:외상매출금:792000:book",
+    "asset:외상매출금:792000:receivable",
     "asset:비품:600000:depreciation",
-    "asset:임차보증금:100000:book",
+    "asset:임차보증금:100000:receivable",
     "asset:이연법인세자산:30000:zero",
     "liability:미지급금:90000:unconfirmed",
-    "liability:미지급비용:35000:manual",
+    "liability:미지급비용:35000:provision",
     "liability:예수금:8000:book",
     "liability:부가세예수금:25000:book",
     "liability:미지급법인세:60000:corporateTax",
@@ -51,7 +51,7 @@ test("재무상태표 붙여넣기: 자산·부채 구분, 차감계정 합산, 
 
 test("제목 줄이 없으면 현재 단계 구분을 따름", () => {
   const { rows } = parseBalanceSheet("차입금\t1,000\n선수금\t500", "liability");
-  assert.deepEqual(rows.map((r) => `${r.side}:${r.method}`), ["liability:book", "liability:book"]);
+  assert.deepEqual(rows.map((r) => `${r.side}:${r.method}`), ["liability:borrowing", "liability:book"]);
 });
 
 test("앞쪽 계정코드 열은 무시하고 계정명 다음의 첫 금액을 사용", () => {
@@ -60,13 +60,17 @@ test("앞쪽 계정코드 열은 무시하고 계정명 다음의 첫 금액을 
   assert.equal(rows[0].amount, 200000);
 });
 
-test("직접 입력 방식 계정은 평가액을 장부가액으로 미리 채움", () => {
+test("붙여넣은 계정은 장부가액만 채우고 평가 입력값은 비워 둠", () => {
   const accounts = rowsToAccounts(parseBalanceSheet("부채\n미지급비용\t35,000", "asset").rows);
-  assert.equal(accounts[0].manualValue, "35000");
   assert.equal(accounts[0].bookValue, "35000");
+  assert.equal(accounts[0].confirmedAmount, "");
+  assert.equal(accounts[0].manualValue, "");
 });
 
-import { parseDateCell, parseEmployees, parseFixedAssets } from "./index.ts";
+test("상장/비상장 주식, 대여금 구분", () => {
+  const { rows } = parseBalanceSheet("비상장주식\t1,000\n상장주식\t2,000\n출자금\t3,000\n대여금\t4,000", "asset");
+  assert.deepEqual(rows.map((r) => r.method), ["manual", "listedStock", "manual", "receivable"]);
+});
 
 test("날짜 형식 인식", () => {
   assert.equal(parseDateCell("2018-08-30"), "2018-08-30");

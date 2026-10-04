@@ -1,231 +1,42 @@
 "use client";
 
-import { useState } from "react";
+// 명세가 필요한 평가 유형의 편집기 (감가상각 자산, 미확정 채무, 법인세, 직원)
 import {
-  ACCOUNT_PRESETS,
-  METHOD_LABELS,
-  METHODS_BY_SIDE,
   corporateTaxPayable,
-  createAccount,
   createEmployee,
   createFixedAsset,
   createTaxCredit,
   createUnconfirmed,
   fixedAssetTaxValue,
   isCorporateTaxEmpty,
-  matchPreset,
+  num,
   parseEmployees,
   parseFixedAssets,
-  num,
   severanceEstimate,
   standardRate,
   type Account,
-  type AccountValue,
   type CorporateTaxInput,
   type DepreciationMethod,
-  type Side,
-  type ValuationMethod,
 } from "@/lib/valuation/index.ts";
-import {
-  Checkbox,
-  DateInput,
-  MiniField,
-  NumberInput,
-  RemoveButton,
-  ResultRow,
-  SmallButton,
-  StepSection,
-  TextInput,
-  formatWon,
-} from "./ui";
-import ImportPanel from "./ImportPanel";
 import RowPastePanel from "./RowPastePanel";
+import { Checkbox, DateInput, MiniField, NumberInput, RemoveButton, ResultRow, SmallButton, TextInput, formatWon } from "./ui";
 
-interface Context {
+export interface EditorContext {
   valuationDate: string;
   fiscalYearEndMonth: number;
 }
 
-const SIDE_TEXT: Record<Side, { title: string; description: string }> = {
-  asset: {
-    title: "자산 평가",
-    description:
-      "평가기준일 현재 재무상태표를 엑셀에서 복사해 붙여넣으세요. 붙여넣은 계정마다 상증세법상 평가방법을 확인하고, 필요하면 계정을 추가하거나 삭제할 수 있어요.",
-  },
-  liability: {
-    title: "부채 평가",
-    description:
-      "자산 단계에서 재무상태표 전체를 붙여넣었다면 부채도 함께 들어와 있어요. 부채만 따로 붙여넣을 수도 있어요. 부채는 평가기준일 현재 지급의무가 확정된 금액만 인정됩니다.",
-  },
-};
-
-function replaceById<T extends { id: string }>(rows: T[], id: string, patch: Partial<T>): T[] {
+export function replaceById<T extends { id: string }>(rows: T[], id: string, patch: Partial<T>): T[] {
   return rows.map((row) => (row.id === id ? { ...row, ...patch } : row));
 }
 
-export default function AccountsStep({
-  side,
-  accounts,
-  values,
-  context,
-  onChange,
-}: {
-  side: Side;
-  accounts: Account[];
-  values: Map<string, AccountValue>;
-  context: Context;
-  onChange: (accounts: Account[]) => void;
-}) {
-  const presets = ACCOUNT_PRESETS.filter((preset) => preset.side === side);
-  const [presetName, setPresetName] = useState(presets[0].name);
-  const sideAccounts = accounts.filter((account) => account.side === side);
-
-  const bookTotal = sideAccounts.reduce((sum, account) => sum + (values.get(account.id)?.book ?? 0), 0);
-  const taxTotal = sideAccounts.reduce((sum, account) => sum + (values.get(account.id)?.taxValue ?? 0), 0);
-
-  function addAccount() {
-    const preset = presets.find((p) => p.name === presetName) ?? presets[0];
-    onChange([...accounts, createAccount(side, preset.name, preset.method)]);
-  }
-
-  return (
-    <StepSection title={SIDE_TEXT[side].title} description={SIDE_TEXT[side].description}>
-      <ImportPanel side={side} accounts={accounts} onChange={onChange} />
-
-      {sideAccounts.map((account) => (
-        <AccountCard
-          key={account.id}
-          account={account}
-          value={values.get(account.id)}
-          context={context}
-          onChange={(patch) => onChange(replaceById(accounts, account.id, patch))}
-          onRemove={() => onChange(accounts.filter((a) => a.id !== account.id))}
-        />
-      ))}
-
-      {sideAccounts.length > 0 && (
-        <>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={presetName}
-              onChange={(e) => setPresetName(e.target.value)}
-              aria-label="추가할 계정과목"
-              className="input w-auto flex-1"
-            >
-              {presets.map((preset) => (
-                <option key={preset.name} value={preset.name}>
-                  {preset.name}
-                </option>
-              ))}
-            </select>
-            <button type="button" onClick={addAccount} className="btn-secondary">
-              계정 추가
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-2 rounded-xl bg-zinc-50 p-4 dark:bg-zinc-900">
-            <ResultRow label="재무상태표 금액 합계" value={formatWon(bookTotal)} />
-            <ResultRow label="상증세법상 평가액 합계" value={formatWon(taxTotal)} />
-            <ResultRow label="평가차액 합계" value={formatWon(taxTotal - bookTotal)} emphasize />
-          </div>
-        </>
-      )}
-    </StepSection>
-  );
-}
-
-function AccountCard({
-  account,
-  value,
-  context,
-  onChange,
-  onRemove,
-}: {
-  account: Account;
-  value: AccountValue | undefined;
-  context: Context;
-  onChange: (patch: Partial<Account>) => void;
-  onRemove: () => void;
-}) {
-  const hint = matchPreset(account.name, account.side)?.hint;
-
-  return (
-    <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-      <div className="flex items-center gap-2">
-        <TextInput value={account.name} onChange={(name) => onChange({ name })} placeholder="계정과목명" ariaLabel="계정과목명" />
-        <RemoveButton onClick={onRemove} label={`${account.name || "계정"} 삭제`} />
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <MiniField label="재무상태표 금액">
-          <NumberInput value={account.bookValue} onChange={(bookValue) => onChange({ bookValue })} />
-        </MiniField>
-        <MiniField label="평가방법">
-          <select
-            value={account.method}
-            onChange={(e) => onChange({ method: e.target.value as ValuationMethod })}
-            className="input"
-          >
-            {METHODS_BY_SIDE[account.side].map((method) => (
-              <option key={method} value={method}>
-                {METHOD_LABELS[method]}
-              </option>
-            ))}
-          </select>
-        </MiniField>
-      </div>
-
-      {hint && <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">{hint}</p>}
-
-      {account.method === "manual" && (
-        <MiniField label="상증세법상 평가액">
-          <NumberInput value={account.manualValue} onChange={(manualValue) => onChange({ manualValue })} />
-        </MiniField>
-      )}
-
-      {account.method === "deposit" && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <MiniField label="평가기준일까지의 미수이자">
-            <NumberInput value={account.accruedInterest} onChange={(accruedInterest) => onChange({ accruedInterest })} />
-          </MiniField>
-          <MiniField label="원천징수세율 (%)">
-            <NumberInput
-              value={account.withholdingRatePercent}
-              onChange={(withholdingRatePercent) => onChange({ withholdingRatePercent })}
-            />
-          </MiniField>
-        </div>
-      )}
-
-      {account.method === "depreciation" && <FixedAssetsEditor account={account} context={context} onChange={onChange} />}
-      {account.method === "unconfirmed" && <UnconfirmedEditor account={account} onChange={onChange} />}
-      {account.method === "corporateTax" && (
-        <CorporateTaxEditor value={account.corporateTax} onChange={(corporateTax) => onChange({ corporateTax })} />
-      )}
-      {account.method === "severance" && <EmployeesEditor account={account} context={context} onChange={onChange} />}
-
-      {value && (
-        <div className="flex flex-col gap-1 border-t border-zinc-100 pt-3 dark:border-zinc-800">
-          <ResultRow label="상증세법상 평가액" value={formatWon(value.taxValue)} />
-          <ResultRow label="평가차액" value={formatWon(value.diff)} />
-          {value.fallbackToBook && (
-            <p className="text-xs text-amber-700 dark:text-amber-400">
-              명세가 입력되지 않아 재무상태표 금액으로 평가했습니다.
-            </p>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function FixedAssetsEditor({
+export function FixedAssetsEditor({
   account,
   context,
   onChange,
 }: {
   account: Account;
-  context: Context;
+  context: EditorContext;
   onChange: (patch: Partial<Account>) => void;
 }) {
   const rows = account.fixedAssets;
@@ -306,7 +117,7 @@ function FixedAssetsEditor({
   );
 }
 
-function UnconfirmedEditor({ account, onChange }: { account: Account; onChange: (patch: Partial<Account>) => void }) {
+export function UnconfirmedEditor({ account, onChange }: { account: Account; onChange: (patch: Partial<Account>) => void }) {
   const rows = account.unconfirmed;
   return (
     <div className="flex flex-col gap-2">
@@ -344,7 +155,7 @@ const TAX_FIELDS: { key: Exclude<keyof CorporateTaxInput, "credits">; label: str
   { key: "localWithheld", label: "원천납부세액 (지방소득세분)" },
 ];
 
-function CorporateTaxEditor({ value, onChange }: { value: CorporateTaxInput; onChange: (value: CorporateTaxInput) => void }) {
+export function CorporateTaxEditor({ value, onChange }: { value: CorporateTaxInput; onChange: (value: CorporateTaxInput) => void }) {
   const credits = value.credits;
   const result = isCorporateTaxEmpty(value) ? null : corporateTaxPayable(value);
 
@@ -408,13 +219,13 @@ function CorporateTaxEditor({ value, onChange }: { value: CorporateTaxInput; onC
   );
 }
 
-function EmployeesEditor({
+export function EmployeesEditor({
   account,
   context,
   onChange,
 }: {
   account: Account;
-  context: Context;
+  context: EditorContext;
   onChange: (patch: Partial<Account>) => void;
 }) {
   const rows = account.employees;

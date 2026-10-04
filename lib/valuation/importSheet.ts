@@ -23,13 +23,16 @@ const RULES: { side: Side; pattern: RegExp; preset: string }[] = [
   { side: "asset", pattern: /매출채권|외상매출|받을어음/, preset: "매출채권" },
   { side: "asset", pattern: /미수수익/, preset: "미수수익" },
   { side: "asset", pattern: /미수금/, preset: "미수금" },
+  { side: "asset", pattern: /대여금/, preset: "대여금" },
   { side: "asset", pattern: /선급법인세|선납법인세|원천납부/, preset: "선급법인세" },
   { side: "asset", pattern: /선급비용/, preset: "선급비용" },
   { side: "asset", pattern: /선급금/, preset: "선급금" },
   { side: "asset", pattern: /계약자산/, preset: "계약자산" },
   { side: "asset", pattern: /재고|상품|제품|원재료|재공품|저장품/, preset: "재고자산" },
   { side: "asset", pattern: /보증금/, preset: "임차보증금" },
-  { side: "asset", pattern: /주식|유가증권|금융자산|출자금|지분/, preset: "금융자산(주식 등)" },
+  { side: "asset", pattern: /비상장|출자금|지분|관계기업|종속기업/, preset: "비상장주식·출자금" },
+  { side: "asset", pattern: /상장주식|단기매매증권|시장성/, preset: "상장주식" },
+  { side: "asset", pattern: /주식|유가증권|금융자산/, preset: "비상장주식·출자금" },
   { side: "asset", pattern: /토지/, preset: "토지" },
   { side: "asset", pattern: /건물|구축물/, preset: "건물" },
   { side: "asset", pattern: /소프트웨어|개발비|무형|특허|상표|산업재산권/, preset: "무형자산(소프트웨어 등)" },
@@ -38,6 +41,7 @@ const RULES: { side: Side; pattern: RegExp; preset: string }[] = [
   { side: "liability", pattern: /리스부채/, preset: "리스부채" },
   { side: "liability", pattern: /퇴직급여|퇴직금|확정급여/, preset: "퇴직급여충당부채" },
   { side: "liability", pattern: /법인세/, preset: "당기법인세부채" },
+  { side: "liability", pattern: /매입채무|외상매입|지급어음/, preset: "매입채무" },
   { side: "liability", pattern: /미지급비용/, preset: "미지급비용" },
   { side: "liability", pattern: /장기미지급/, preset: "장기미지급금" },
   { side: "liability", pattern: /미지급/, preset: "미지급금" },
@@ -139,8 +143,7 @@ export function rowsToAccounts(rows: ImportedRow[]): Account[] {
   return rows.map((row) => {
     const account = createAccount(row.side, row.name, row.method);
     const book = String(row.amount);
-    // 직접 입력 방식은 평가액을 장부가액으로 미리 채워 둠 (사용자가 고칠 때까지 평가차액 0)
-    return { ...account, bookValue: book, manualValue: row.method === "manual" ? book : "" };
+    return { ...account, bookValue: book };
   });
 }
 

@@ -38,7 +38,7 @@ export default function ImportPanel({
     onChange([...kept, ...imported]);
     const assets = parsed.rows.filter((row) => row.side === "asset").length;
     const liabilities = parsed.rows.length - assets;
-    setDone(`자산 ${assets}개, 부채 ${liabilities}개 계정을 넣었어요. 아래에서 평가방법을 확인해 주세요.`);
+    setDone(`자산 ${assets}개, 부채 ${liabilities}개 계정을 넣었어요. 아래에서 평가 유형을 확인해 주세요.`);
     setText("");
     setParsed(null);
   }
@@ -78,7 +78,7 @@ export default function ImportPanel({
                     <th className="px-2 py-1.5 text-left font-medium">구분</th>
                     <th className="px-2 py-1.5 text-left font-medium">계정과목</th>
                     <th className="px-2 py-1.5 text-right font-medium">금액</th>
-                    <th className="px-2 py-1.5 text-left font-medium">평가방법</th>
+                    <th className="px-2 py-1.5 text-left font-medium">평가 유형</th>
                   </tr>
                 </thead>
                 <tbody>
