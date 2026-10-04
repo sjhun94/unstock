@@ -16,7 +16,17 @@ import { NumberInput, RemoveButton, ResultRow, StepSection, TextInput, formatWon
 
 const SIDE_LABEL: Record<Side, string> = { asset: "자산", liability: "부채" };
 
-export default function BalanceSheetStep({ accounts, onChange }: { accounts: Account[]; onChange: (accounts: Account[]) => void }) {
+export default function BalanceSheetStep({
+  accounts,
+  valuationDate,
+  fiscalYearEndMonth,
+  onChange,
+}: {
+  accounts: Account[];
+  valuationDate: string;
+  fiscalYearEndMonth: number;
+  onChange: (accounts: Account[]) => void;
+}) {
   const update = (id: string, patch: Partial<Account>) =>
     onChange(accounts.map((account) => (account.id === id ? { ...account, ...patch } : account)));
 
@@ -25,7 +35,13 @@ export default function BalanceSheetStep({ accounts, onChange }: { accounts: Acc
       title="재무상태표"
       description="평가기준일 현재 재무상태표를 엑셀에서 복사해 붙여넣으세요. 계정마다 평가 유형을 자동으로 정해 두니, 맞는지 확인하고 필요하면 바꿔 주세요. 다음 단계에서 유형별로 평가에 필요한 값을 입력합니다."
     >
-      <ImportPanel side="asset" accounts={accounts} onChange={onChange} />
+      <ImportPanel
+        side="asset"
+        accounts={accounts}
+        valuationDate={valuationDate}
+        fiscalYearEndMonth={fiscalYearEndMonth}
+        onChange={onChange}
+      />
 
       {(["asset", "liability"] as Side[]).map((side) => {
         const rows = accounts.filter((account) => account.side === side);

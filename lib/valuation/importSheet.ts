@@ -10,9 +10,34 @@ export interface ImportedRow {
   method: ValuationMethod;
 }
 
+// 붙여넣은 표에서 금액이 들어 있는 열 하나 (분기·연도별 재무상태표가 여러 열일 수 있음)
+export interface AmountColumn {
+  index: number; // 붙여넣은 줄에서의 칸 위치
+  label: string; // 머리글 (없으면 "n번째 금액 열")
+  date: string | null; // 머리글에서 읽은 기준일 YYYY-MM-DD
+}
+
+export type ColumnReason =
+  | "valuationDate"
+  | "beforeValuationDate"
+  | "afterValuationDate"
+  | "latest"
+  | "current"
+  | "first"
+  | "manual";
+
 export interface ImportResult {
   rows: ImportedRow[];
   skipped: number; // 제목·소계·자본 등으로 건너뛴 줄 수
+  columns: AmountColumn[]; // 금액 열이 2개 이상일 때만 채워짐
+  column: number | null; // 실제로 읽은 열의 index
+  reason: ColumnReason | null; // 그 열을 고른 이유
+}
+
+export interface ParseOptions {
+  column?: number | null; // 사용자가 고른 열
+  valuationDate?: string; // 평가기준일 YYYY-MM-DD (추천 열을 고를 때 사용)
+  fiscalYearEndMonth?: number; // "2024년", "3분기"처럼 월이 없는 머리글을 날짜로 바꿀 때 사용
 }
 
 // 계정명 → 프리셋. 위에서부터 먼저 맞는 규칙을 씁니다.
@@ -97,23 +122,137 @@ function sectionOf(name: string): Side | "equity" | null {
   return null;
 }
 
-export function parseBalanceSheet(text: string, defaultSide: Side): ImportResult {
+function lastDayOfMonth(year: number, month: number) {
+  const day = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+// 열 머리글 → 기준일. "2024.09.30", "2024년 9월말", "FY2024 9월말", "2024.3Q", "2024년 3분기", "2024년" 등
+export function parsePeriodLabel(label: string, fiscalYearEndMonth = 12): string | null {
+  const text = label.replace(/[\s　]+/g, "");
+  const full = parseDateCell(text) ?? parseDateCell(text.replace(/(\d{4})년(\d{1,2})월(\d{1,2})일?/, "$1-$2-$3"));
+  if (full) return full;
+  const year = /(\d{4})/.exec(text);
+  if (!year) return null;
+  const quarter = /([1-4])(?:Q|분기)/i.exec(text.slice(year.index + 4)) ?? /Q([1-4])/i.exec(text);
+  if (quarter) return lastDayOfMonth(Number(year[1]), Number(quarter[1]) * 3);
+  if (/반기/.test(text)) return lastDayOfMonth(Number(year[1]), 6);
+  const yearMonth = /(\d{4})(?:[.\-/년]|(?=\d{1,2}월))(\d{1,2})(?!\d)/.exec(text) ?? /^(?:FY)?(\d{4})(\d{2})$/i.exec(text);
+  if (yearMonth) {
+    const month = Number(yearMonth[2]);
+    if (month >= 1 && month <= 12) return lastDayOfMonth(Number(yearMonth[1]), month);
+  }
+  if (/^(FY)?\d{4}(년|년도)?(말|기말)?$/i.test(text)) return lastDayOfMonth(Number(year[1]), fiscalYearEndMonth);
+  return null;
+}
+
+function splitLine(line: string) {
+  return line.includes("\t") ? line.split("\t") : line.split(/\s{2,}/);
+}
+
+function nameIndexOf(cells: string[]) {
+  return cells.findIndex((cell) => /[가-힣A-Za-z]/.test(cell) && parseAmount(cell) === null);
+}
+
+// 금액이 들어 있는 열과 그 머리글을 찾습니다.
+function findAmountColumns(lines: string[][], fiscalYearEndMonth?: number): AmountColumn[] {
+  const counts = new Map<number, { n: number; max: number }>();
+  let firstAmountLine = -1;
+  lines.forEach((cells, lineIndex) => {
+    const nameIndex = nameIndexOf(cells);
+    if (nameIndex < 0) return;
+    for (let i = nameIndex + 1; i < cells.length; i++) {
+      const amount = parseAmount(cells[i]);
+      if (amount === null) continue;
+      if (firstAmountLine < 0) firstAmountLine = lineIndex;
+      const entry = counts.get(i) ?? { n: 0, max: 0 };
+      counts.set(i, { n: entry.n + 1, max: Math.max(entry.max, Math.abs(amount)) });
+    }
+  });
+  const most = Math.max(0, ...[...counts.values()].map((c) => c.n));
+  // 주석 번호처럼 작은 숫자만 있는 열, 금액이 드문 열은 제외
+  const indexes = [...counts.entries()]
+    .filter(([, c]) => c.max >= 1000 && c.n >= Math.max(1, Math.ceil(most * 0.2)))
+    .map(([index]) => index)
+    .sort((a, b) => a - b);
+
+  // 첫 금액 줄 위의 머리글 줄에서 열 이름을 읽음. 병합된 머리글(기준일이 왼쪽 칸에만 있음)은 왼쪽의 기준일을 이어받음
+  const headers = lines.slice(0, Math.max(0, firstAmountLine));
+  return indexes.map((index, order) => {
+    const parts: string[] = [];
+    for (const cells of headers) {
+      const own = (cells[index] ?? "").trim();
+      if (own && parseAmount(own) === null) {
+        parts.push(own);
+        continue;
+      }
+      if (own) continue;
+      for (let i = index - 1; i >= 0; i--) {
+        const left = (cells[i] ?? "").trim();
+        if (!left) continue;
+        if (parsePeriodLabel(left, fiscalYearEndMonth)) parts.push(left);
+        break;
+      }
+    }
+    const label = parts.join(" ").replace(/[\s　]+/g, " ").trim();
+    const date = parts.map((part) => parsePeriodLabel(part, fiscalYearEndMonth)).find((d) => d) ?? null;
+    return { index, label: label || `${order + 1}번째 금액 열`, date };
+  });
+}
+
+// 어느 열을 쓸지 추천: 평가기준일과 같은 시점 → 평가기준일 직전 → 평가기준일 직후 → (평가기준일 없으면) 가장 최근 → '당기' → 첫 번째 열
+function recommendColumn(columns: AmountColumn[], valuationDate?: string): { index: number; reason: ColumnReason } {
+  const dated = columns.filter((c) => c.date).sort((a, b) => (a.date! < b.date! ? 1 : -1));
+  if (dated.length > 0) {
+    if (valuationDate) {
+      const same = dated.find((c) => c.date === valuationDate);
+      if (same) return { index: same.index, reason: "valuationDate" };
+      const before = dated.find((c) => c.date! < valuationDate);
+      if (before) return { index: before.index, reason: "beforeValuationDate" };
+      return { index: dated[dated.length - 1].index, reason: "afterValuationDate" };
+    }
+    return { index: dated[0].index, reason: "latest" };
+  }
+  const current = columns.find((c) => /당기|\(당\)/.test(c.label.replace(/\s/g, "")));
+  if (current) return { index: current.index, reason: "current" };
+  const terms = columns
+    .map((c) => ({ c, n: Number(/제\s*(\d+)/.exec(c.label)?.[1] ?? NaN) }))
+    .filter((t) => !Number.isNaN(t.n))
+    .sort((a, b) => b.n - a.n);
+  if (terms.length > 0) return { index: terms[0].c.index, reason: "current" };
+  return { index: columns[0].index, reason: "first" };
+}
+
+export function parseBalanceSheet(text: string, defaultSide: Side, options: ParseOptions = {}): ImportResult {
   const rows: ImportedRow[] = [];
   let skipped = 0;
   let section: Side | "equity" = defaultSide;
 
-  for (const line of text.split(/\r?\n/)) {
-    if (line.trim() === "") continue;
-    const cells = line.includes("\t") ? line.split("\t") : line.split(/\s{2,}/);
+  const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "").map(splitLine);
+  const found = findAmountColumns(lines, options.fiscalYearEndMonth);
+  const columns = found.length >= 2 ? found : [];
+  let column: number | null = null;
+  let reason: ColumnReason | null = null;
+  if (columns.length > 0) {
+    const chosen = columns.find((c) => c.index === options.column);
+    if (chosen) {
+      column = chosen.index;
+      reason = "manual";
+    } else {
+      ({ index: column, reason } = recommendColumn(columns, options.valuationDate));
+    }
+  }
 
-    const nameIndex = cells.findIndex((cell) => /[가-힣A-Za-z]/.test(cell) && parseAmount(cell) === null);
+  for (const cells of lines) {
+    const nameIndex = nameIndexOf(cells);
     if (nameIndex < 0) {
       skipped++;
       continue;
     }
     const name = stripNumbering(cells[nameIndex]);
     let amount: number | null = null;
-    for (let i = nameIndex + 1; i < cells.length && amount === null; i++) amount = parseAmount(cells[i]);
+    if (column !== null) amount = column > nameIndex ? parseAmount(cells[column] ?? "") : null;
+    else for (let i = nameIndex + 1; i < cells.length && amount === null; i++) amount = parseAmount(cells[i]);
 
     const nextSection = sectionOf(name);
     if (nextSection) section = nextSection;
@@ -136,7 +275,7 @@ export function parseBalanceSheet(text: string, defaultSide: Side): ImportResult
     rows.push({ side, name, amount, method: preset?.method ?? "book" });
   }
 
-  return { rows, skipped };
+  return { rows, skipped, columns, column, reason };
 }
 
 export function rowsToAccounts(rows: ImportedRow[]): Account[] {

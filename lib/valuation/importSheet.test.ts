@@ -1,7 +1,7 @@
 // 실행: node --test lib/valuation/importSheet.test.ts  (가상의 숫자)
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { parseBalanceSheet, parseDateCell, parseEmployees, parseFixedAssets, rowsToAccounts } from "./index.ts";
+import { parseBalanceSheet, parseDateCell, parseEmployees, parseFixedAssets, parsePeriodLabel, rowsToAccounts } from "./index.ts";
 
 const SHEET = [
   "과목\t당기\t전기",
@@ -70,6 +70,54 @@ test("붙여넣은 계정은 장부가액만 채우고 평가 입력값은 비�
 test("상장/비상장 주식, 대여금 구분", () => {
   const { rows } = parseBalanceSheet("비상장주식\t1,000\n상장주식\t2,000\n출자금\t3,000\n대여금\t4,000", "asset");
   assert.deepEqual(rows.map((r) => r.method), ["manual", "listedStock", "manual", "receivable"]);
+});
+
+const QUARTERS = [
+  "과목\t2024.03.31\t2024.06.30\t2024.09.30\t2024.12.31",
+  "보통예금\t100,000\t200,000\t300,000\t400,000",
+  "외상매출금\t1,000\t2,000\t3,000\t4,000",
+  "부채",
+  "미지급금\t10,000\t20,000\t30,000\t40,000",
+].join("\n");
+
+test("여러 시점 열: 평가기준일과 같은 열을 자동 선택", () => {
+  const result = parseBalanceSheet(QUARTERS, "asset", { valuationDate: "2024-09-30" });
+  assert.deepEqual(result.columns.map((c) => c.date), ["2024-03-31", "2024-06-30", "2024-09-30", "2024-12-31"]);
+  assert.equal(result.reason, "valuationDate");
+  assert.deepEqual(result.rows.map((r) => r.amount), [300000, 3000, 30000]);
+});
+
+test("여러 시점 열: 같은 날짜가 없으면 직전 시점, 평가기준일이 없으면 최근 시점", () => {
+  const before = parseBalanceSheet(QUARTERS, "asset", { valuationDate: "2024-08-15" });
+  assert.equal(before.reason, "beforeValuationDate");
+  assert.equal(before.rows[0].amount, 200000);
+  const latest = parseBalanceSheet(QUARTERS, "asset");
+  assert.equal(latest.reason, "latest");
+  assert.equal(latest.rows[0].amount, 400000);
+});
+
+test("여러 시점 열: 사용자가 고른 열을 사용", () => {
+  const result = parseBalanceSheet(QUARTERS, "asset", { valuationDate: "2024-09-30", column: 1 });
+  assert.equal(result.reason, "manual");
+  assert.equal(result.rows[0].amount, 100000);
+});
+
+test("당기/전기 머리글이면 당기, 머리글이 없으면 첫 번째 열", () => {
+  assert.equal(parseBalanceSheet(SHEET, "asset").reason, "current");
+  assert.equal(parseBalanceSheet("보통예금\t200,000\t150,000", "asset").reason, "first");
+  const terms = parseBalanceSheet("과목\t제 19(전)기\t제 20(당)기\n보통예금\t150,000\t200,000", "asset");
+  assert.equal(terms.rows[0].amount, 200000);
+});
+
+test("분기·연도 머리글 인식", () => {
+  assert.equal(parsePeriodLabel("FY2024 9월말"), "2024-09-30");
+  assert.equal(parsePeriodLabel("2024년 6월말"), "2024-06-30");
+  assert.equal(parsePeriodLabel("2024.3Q"), "2024-09-30");
+  assert.equal(parsePeriodLabel("2024년 1분기"), "2024-03-31");
+  assert.equal(parsePeriodLabel("2024년 반기"), "2024-06-30");
+  assert.equal(parsePeriodLabel("2024-02"), "2024-02-29");
+  assert.equal(parsePeriodLabel("FY2023", 3), "2023-03-31");
+  assert.equal(parsePeriodLabel("당기"), null);
 });
 
 test("날짜 형식 인식", () => {

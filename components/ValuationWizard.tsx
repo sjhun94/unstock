@@ -72,7 +72,12 @@ export default function ValuationWizard({ onExitToLanding }: { onExitToLanding?:
       <div className="flex min-w-0 flex-1 flex-col gap-8 rounded-2xl border border-black/10 bg-white p-6 shadow-sm sm:p-8 dark:border-white/10 dark:bg-zinc-950">
         {step === 0 && <BasicInfoStep value={state.basic} onChange={(basic) => setState((prev) => ({ ...prev, basic }))} />}
         {step === 1 && (
-          <BalanceSheetStep accounts={state.accounts} onChange={(accounts) => setState((prev) => ({ ...prev, accounts }))} />
+          <BalanceSheetStep
+            accounts={state.accounts}
+            valuationDate={context.valuationDate}
+            fiscalYearEndMonth={context.fiscalYearEndMonth}
+            onChange={(accounts) => setState((prev) => ({ ...prev, accounts }))}
+          />
         )}
         {(step === 2 || step === 3) && (
           <EvaluationStep
