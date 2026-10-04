@@ -12,6 +12,9 @@ import {
 
 const VWORLD = "https://api.vworld.kr";
 
+// 브이월드는 해외에서 오는 요청을 막는 경우가 있어 이 라우트는 서울 리전에서 실행
+export const preferredRegion = "icn1";
+
 // 같은 사용자가 짧은 시간에 너무 많이 조회하지 않도록 제한 (서버 인스턴스별, 1분에 20번)
 const hits = new Map<string, number[]>();
 function rateLimited(ip: string): boolean {
@@ -34,8 +37,14 @@ async function vworld(path: string, params: Record<string, string>): Promise<unk
   const url = new URL(path, VWORLD);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(8000) });
-  if (!res.ok) throw new Error(`vworld ${res.status}`);
-  return res.json();
+  if (!res.ok) throw new Error(`vworld ${path} HTTP ${res.status}`);
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    // 키 오류 등은 JSON이 아닌 안내문으로 올 때가 있음 (키 값은 기록하지 않음)
+    throw new Error(`vworld ${path} non-JSON: ${text.slice(0, 200)}`);
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -78,9 +87,12 @@ export async function GET(request: NextRequest) {
       if (candidates.length === 0) {
         return reply({ kind: "error", code: "not_found", message: "주소를 찾지 못했어요. 지번 주소(예: 서울특별시 중구 태평로1가 31)로 입력해 주세요." }, 404);
       }
-      if (candidates.length > 1) return reply({ kind: "candidates", candidates });
-      pnu = candidates[0].pnu;
-      parcelAddress = candidates[0].address;
+      // 입력한 주소와 정확히 같은 필지가 있으면 바로 그 필지를 씀
+      const plain = (text: string) => text.replace(/\s/g, "");
+      const exact = candidates.find((c) => plain(c.address) === plain(address));
+      if (!exact && candidates.length > 1) return reply({ kind: "candidates", candidates });
+      pnu = (exact ?? candidates[0]).pnu;
+      parcelAddress = (exact ?? candidates[0]).address;
     }
 
     // 평가기준일이 속한 해와 그 전 2년의 공시지가를 함께 조회해 평가기준일 현재 고시된 가격을 고름
@@ -118,7 +130,8 @@ export async function GET(request: NextRequest) {
             : `${picked.year}년 공시지가(${picked.announcedDate} 공시)를 적용했어요.`,
       },
     });
-  } catch {
+  } catch (error) {
+    console.error("[land-price]", error instanceof Error ? `${error.message} ${String(error.cause ?? "")}` : error);
     return reply({ kind: "error", code: "upstream", message: "공시지가 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요." }, 502);
   }
 }
