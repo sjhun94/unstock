@@ -10,6 +10,7 @@ import {
   createInitialState,
   emptyCorporateTax,
   emptyNetIncomeYear,
+  interestWithholding,
   fixedAssetTaxValue,
   netIncomeYear,
   newId,
@@ -131,8 +132,39 @@ test("순손익액: 12개월 미만 사업연도 연환산", () => {
 
 const CONTEXT = { valuationDate: "2024-09-30", fiscalYearEndMonth: 12 };
 
+test("예금 미수이자: 연이율·날짜로 자동 계산, 원천징수 15.4%", () => {
+  const timeDeposit = {
+    ...createAccount("asset", "정기예금", "deposit"),
+    bookValue: "100000000",
+    interestRatePercent: "3.65",
+    interestFrom: "2024-06-02",
+  };
+  // 6/2 ~ 9/30 = 120일 → 100,000,000 × 3.65% × 120/365 = 1,200,000, 원천징수 168,000 + 16,800
+  const computed = accountValue(timeDeposit, CONTEXT);
+  assert.equal(computed.taxValue, 101_015_200);
+  assert.equal(computed.fallbackToBook, false);
+
+  // 직접 입력: 원천징수를 비우면 15.4% (140,000 + 14,000)
+  const manual = { ...timeDeposit, interestManual: true, accruedInterest: "1000000" };
+  assert.equal(accountValue(manual, CONTEXT).taxValue, 100_846_000);
+  assert.equal(interestWithholding(1_234_567), 172_830 + 17_280);
+
+  // 보통예금은 입력이 없어도 미수이자 0원(경고 없음), 정기예금은 입력이 없으면 경고
+  const demand = accountValue({ ...createAccount("asset", "보통예금", "deposit"), bookValue: "5000000" }, CONTEXT);
+  assert.equal(demand.taxValue, 5_000_000);
+  assert.equal(demand.fallbackToBook, false);
+  const missing = accountValue({ ...createAccount("asset", "정기예금", "deposit"), bookValue: "5000000" }, CONTEXT);
+  assert.equal(missing.fallbackToBook, true);
+});
+
 test("계정 평가방법별 평가액", () => {
-  const deposit = { ...createAccount("asset", "예금", "deposit"), bookValue: "200000000", accruedInterest: "1000000", withholdingTax: "140000" };
+  const deposit = {
+    ...createAccount("asset", "예금", "deposit"),
+    bookValue: "200000000",
+    interestManual: true,
+    accruedInterest: "1000000",
+    withholdingTax: "140000",
+  };
   assert.equal(accountValue(deposit, CONTEXT).taxValue, 200_860_000); // + 1,000,000 − 140,000
 
   const zero = { ...createAccount("asset", "이연법인세자산", "zero"), bookValue: "50000000" };

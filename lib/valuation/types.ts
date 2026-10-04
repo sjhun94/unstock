@@ -83,8 +83,11 @@ export interface Account {
   bookValue: string; // 재무상태표상 금액
   method: ValuationMethod;
   manualValue: string; // manual: 평가액 / book: 평가액 직접 입력(비우면 장부가액)
-  accruedInterest: string; // deposit: 미수이자 / borrowing: 미지급이자
-  withholdingTax: string; // deposit: 원천징수세액
+  accruedInterest: string; // deposit: 미수이자(직접 입력할 때) / borrowing: 미지급이자
+  withholdingTax: string; // deposit: 원천징수세액(직접 입력할 때, 비우면 15.4%)
+  interestRatePercent: string; // deposit: 연이율(%)
+  interestFrom: string; // deposit: 가입일 또는 마지막으로 이자 받은 날 YYYY-MM-DD
+  interestManual: boolean; // deposit: 미수이자를 직접 입력
   uncollectible: string; // receivable: 회수 불가능한 금액
   over5Years: boolean; // receivable: 회수기간 5년 초과
   presentValue: string; // receivable: 회수기간 5년 초과 시 현재가치

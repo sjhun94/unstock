@@ -4,13 +4,17 @@ import {
   METHOD_DESCRIPTIONS,
   METHOD_LABELS,
   METHODS_BY_SIDE,
+  depositInterest,
+  interestWithholding,
+  isDemandDeposit,
+  num,
   type Account,
   type AccountValue,
   type Side,
   type ValuationMethod,
 } from "@/lib/valuation/index.ts";
 import { CorporateTaxEditor, EmployeesEditor, FixedAssetsEditor, UnconfirmedEditor, type EditorContext } from "./editors";
-import { Checkbox, MiniField, Note, NumberInput, ResultRow, StepSection, formatWon } from "./ui";
+import { Checkbox, DateInput, MiniField, Note, NumberInput, ResultRow, StepSection, formatWon } from "./ui";
 
 const SIDE_TEXT: Record<Side, { title: string; description: string; empty: string }> = {
   asset: {
@@ -65,6 +69,7 @@ export default function EvaluationStep({
             </h3>
             <p className="mt-0.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">{METHOD_DESCRIPTIONS[method]}</p>
           </div>
+          {method === "deposit" && <DepositNotes accounts={accounts} />}
           {rows.map((account) => (
             <AccountCard
               key={account.id}
@@ -120,6 +125,89 @@ export default function EvaluationStep({
   );
 }
 
+function DepositNotes({ accounts }: { accounts: Account[] }) {
+  const accrued = accounts.some((a) => a.side === "asset" && /미수수익|미수이자/.test(a.name.replace(/\s/g, "")));
+  return (
+    <div className="flex flex-col gap-2">
+      {accrued && (
+        <Note tone="warning">
+          재무상태표에 미수수익이 있어요. 결산 때 미수이자를 이미 잡아 둔 것일 수 있으니, 그렇다면 아래 예금에서 미수이자를 또
+          더하지 마세요(이중 계산).
+        </Note>
+      )}
+      <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+        어느 계좌에서 이자를 받았는지는 법인세 신고서의 &apos;원천납부세액명세서&apos;에서 확인할 수 있어요. 금액이 큰 예금만
+        챙기면 충분해요.
+      </p>
+    </div>
+  );
+}
+
+function DepositEditor({
+  account,
+  book,
+  context,
+  onChange,
+}: {
+  account: Account;
+  book: number;
+  context: EditorContext;
+  onChange: (patch: Partial<Account>) => void;
+}) {
+  const result = depositInterest(account, book, context.valuationDate);
+  const demand = isDemandDeposit(account.name);
+
+  return (
+    <div className="flex flex-col gap-3">
+      {account.interestManual ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <MiniField label="평가기준일까지의 미수이자">
+            <NumberInput value={account.accruedInterest} onChange={(accruedInterest) => onChange({ accruedInterest })} />
+          </MiniField>
+          <MiniField label="원천징수세액">
+            <NumberInput
+              value={account.withholdingTax}
+              onChange={(withholdingTax) => onChange({ withholdingTax })}
+              placeholder={`비우면 15.4% (${formatWon(interestWithholding(num(account.accruedInterest)))})`}
+            />
+          </MiniField>
+        </div>
+      ) : (
+        <>
+          {demand && !account.interestRatePercent && !account.interestFrom && (
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              수시로 넣고 빼는 예금은 이자가 아주 적어 미수이자를 0원으로 봐요. 이자가 큰 계좌라면 아래에 입력하세요.
+            </p>
+          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MiniField label="연이율 (%)">
+              <NumberInput
+                value={account.interestRatePercent}
+                onChange={(interestRatePercent) => onChange({ interestRatePercent })}
+                placeholder="예: 3.5"
+              />
+            </MiniField>
+            <MiniField label="가입일 (또는 마지막으로 이자 받은 날)">
+              <DateInput value={account.interestFrom} onChange={(interestFrom) => onChange({ interestFrom })} />
+            </MiniField>
+          </div>
+          {result.mode === "computed" && (
+            <p className="text-xs tabular-nums text-zinc-600 dark:text-zinc-300">
+              미수이자 {formatWon(result.interest)} ({result.days}일분) · 원천징수 {formatWon(result.withholding)} (15.4%)
+            </p>
+          )}
+          {account.interestRatePercent && account.interestFrom && !context.valuationDate && (
+            <p className="text-xs text-amber-700 dark:text-amber-400">기본정보에 평가기준일을 넣으면 미수이자를 계산해요.</p>
+          )}
+        </>
+      )}
+      <Checkbox checked={account.interestManual} onChange={(interestManual) => onChange({ interestManual })}>
+        미수이자를 직접 입력할게요
+      </Checkbox>
+    </div>
+  );
+}
+
 function AccountCard({
   account,
   value,
@@ -145,10 +233,7 @@ function AccountCard({
       </div>
 
       {account.method === "deposit" && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {field("평가기준일까지의 미수이자", "accruedInterest")}
-          {field("원천징수세액", "withholdingTax")}
-        </div>
+        <DepositEditor account={account} book={value?.book ?? 0} context={context} onChange={onChange} />
       )}
 
       {account.method === "receivable" && (

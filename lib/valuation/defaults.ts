@@ -39,7 +39,8 @@ export const METHOD_LABELS: Record<ValuationMethod, string> = {
 
 // 유형별 평가 원칙 (화면 안내 문구)
 export const METHOD_DESCRIPTIONS: Record<ValuationMethod, string> = {
-  deposit: "예입총액에 평가기준일까지의 미수이자를 더하고 원천징수세액을 뺀 금액으로 평가합니다.",
+  deposit:
+    "예입총액에 평가기준일까지의 미수이자를 더하고 원천징수세액(15.4%)을 뺀 금액으로 평가합니다. 보통예금처럼 수시로 넣고 빼는 예금은 이자가 미미해 0원으로 보고, 정기예금·적금은 연이율과 날짜만 넣으면 계산해 드려요.",
   receivable:
     "회수기간이 5년 이내면 장부가액으로, 5년을 넘으면 현재가치로 평가합니다. 평가기준일 현재 회수할 수 없는 금액은 빼세요.",
   realEstate:
@@ -136,6 +137,9 @@ export function createAccount(side: Side, name: string, method: ValuationMethod)
     manualValue: "",
     accruedInterest: "",
     withholdingTax: "",
+    interestRatePercent: "",
+    interestFrom: "",
+    interestManual: false,
     uncollectible: "",
     over5Years: false,
     presentValue: "",
