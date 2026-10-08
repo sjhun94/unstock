@@ -14,6 +14,7 @@ import {
   type ValuationMethod,
 } from "@/lib/valuation/index.ts";
 import { CorporateTaxEditor, EmployeesEditor, FixedAssetsEditor, UnconfirmedEditor, type EditorContext } from "./editors";
+import HousingPriceLookup from "./HousingPriceLookup";
 import LandPriceLookup from "./LandPriceLookup";
 import { Checkbox, DateInput, MiniField, Note, NumberInput, ResultRow, StepSection, formatWon } from "./ui";
 
@@ -253,8 +254,15 @@ function AccountCard({
             {field("시가 (매매·감정·수용가액 등)", "marketValue", "없으면 비워두세요")}
             {field("기준시가 (개별공시지가 등)", "standardValue")}
           </div>
-          {/토지|대지|임야|전답/.test(account.name) && (
+          {/토지|대지|임야|전답/.test(account.name) ? (
             <LandPriceLookup
+              valuationDate={context.valuationDate}
+              onApply={(value, mode) =>
+                onChange({ standardValue: String(mode === "add" ? num(account.standardValue) + value : value) })
+              }
+            />
+          ) : (
+            <HousingPriceLookup
               valuationDate={context.valuationDate}
               onApply={(value, mode) =>
                 onChange({ standardValue: String(mode === "add" ? num(account.standardValue) + value : value) })
@@ -268,9 +276,18 @@ function AccountCard({
       )}
 
       {account.method === "listedStock" && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {field("평가기준일 전후 2개월 종가 평균", "avgPrice")}
-          {field("보유 주식 수", "shareCount")}
+        <div className="flex flex-col gap-2">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {field("평가기준일 전후 2개월 종가 평균", "avgPrice")}
+            {field("보유 주식 수", "shareCount")}
+          </div>
+          <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+            평가기준일 이전 2개월과 이후 2개월, 모두 4개월간 매일의 종가를 평균한 금액이에요(상증세법 제63조).{" "}
+            <a href="https://data.krx.co.kr" target="_blank" rel="noreferrer" className="underline">
+              KRX 정보데이터시스템
+            </a>
+            의 &apos;개별종목 시세 추이&apos;에서 기간을 지정해 종가를 확인할 수 있어요.
+          </p>
         </div>
       )}
 

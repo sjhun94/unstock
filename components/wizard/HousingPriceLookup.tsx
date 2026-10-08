@@ -1,23 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { landStandardValue, type LandCandidate, type LandPriceResponse, type LandPriceResult } from "@/lib/landPrice";
+import type { HousingPriceResult, HousingType, LandCandidate, LandPriceResponse } from "@/lib/landPrice";
 import { MiniField, NumberInput, formatWon } from "./ui";
 
-// 토지 주소로 평가기준일 현재 개별공시지가를 찾아 기준시가(공시지가 × 면적 × 지분)를 채워 줌
-export default function LandPriceLookup({
+// 주택 주소(공동주택은 동·호까지)로 평가기준일 현재 주택 공시가격을 찾아 기준시가를 채워 줌
+export default function HousingPriceLookup({
   valuationDate,
   onApply,
 }: {
   valuationDate: string;
   onApply: (value: number, mode: "set" | "add") => void;
 }) {
+  const [type, setType] = useState<HousingType>("apartment");
   const [address, setAddress] = useState("");
+  const [dong, setDong] = useState("");
+  const [ho, setHo] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<{ message: string; notConfigured: boolean } | null>(null);
   const [candidates, setCandidates] = useState<LandCandidate[]>([]);
-  const [result, setResult] = useState<LandPriceResult | null>(null);
-  const [area, setArea] = useState("");
+  const [result, setResult] = useState<HousingPriceResult | null>(null);
   const [share, setShare] = useState("100");
   const [done, setDone] = useState("");
 
@@ -26,21 +28,29 @@ export default function LandPriceLookup({
       setError({ message: "기본정보에 평가기준일을 먼저 입력해 주세요.", notConfigured: false });
       return;
     }
+    if (type === "apartment" && !ho.trim()) {
+      setError({ message: "공동주택은 호수를 입력해 주세요.", notConfigured: false });
+      return;
+    }
     setLoading(true);
     setError(null);
     setDone("");
     try {
-      const params = new URLSearchParams({ date: valuationDate, ...(query.pnu ? { pnu: query.pnu } : { address: query.address ?? "" }) });
-      if (query.pnu && query.address) params.set("address", query.address);
+      const params = new URLSearchParams({ type, date: valuationDate });
+      if (query.pnu) params.set("pnu", query.pnu);
+      if (query.address) params.set("address", query.address);
+      if (type === "apartment") {
+        params.set("ho", ho.trim());
+        if (dong.trim()) params.set("dong", dong.trim());
+      }
       const res = await fetch(`/api/land-price?${params}`);
       const body = (await res.json()) as LandPriceResponse;
       if (body.kind === "candidates") {
         setCandidates(body.candidates);
         setResult(null);
-      } else if (body.kind === "result") {
+      } else if (body.kind === "housing") {
         setCandidates([]);
         setResult(body.result);
-        setArea(body.result.area !== null ? String(body.result.area) : "");
       } else if (body.kind === "error") {
         setError({ message: body.message, notConfigured: body.code === "not_configured" });
       }
@@ -51,18 +61,29 @@ export default function LandPriceLookup({
     }
   }
 
-  const total = result ? landStandardValue(result.pricePerSqm, Number(area) || 0, Number(share) || 0) : 0;
+  const total = result ? Math.floor((result.price * (Number(share) || 0)) / 100) : 0;
 
   return (
     <details className="rounded-lg border border-zinc-300 p-3 dark:border-zinc-700">
-      <summary className="cursor-pointer text-xs font-semibold text-zinc-800 dark:text-zinc-100">주소로 개별공시지가 찾기</summary>
+      <summary className="cursor-pointer text-xs font-semibold text-zinc-800 dark:text-zinc-100">주소로 주택 공시가격 찾기</summary>
       <div className="mt-2 flex flex-col gap-2">
         <p className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-          토지의 지번 주소를 넣으면 평가기준일 현재 고시된 개별공시지가와 토지대장 면적을 찾아 기준시가를 계산해요. 필지가 여러
-          개면 하나씩 조회해 &apos;더하기&apos;를 누르세요.
+          주택은 토지와 건물을 합친 공시가격이 기준시가예요. 재무상태표에 같은 주택의 토지·건물이 따로 있으면, 한 계정에 공시가격
+          전체를 넣고 다른 계정은 0원으로 하거나 장부가액 비율로 나눠 넣어 주세요. 사무실·상가·공장 같은 일반 건물은 공시가격이 없어
+          조회되지 않아요.
         </p>
+        <div className="flex gap-4 text-xs text-zinc-700 dark:text-zinc-300">
+          <label className="flex items-center gap-1.5">
+            <input type="radio" checked={type === "apartment"} onChange={() => setType("apartment")} />
+            아파트·연립·다세대
+          </label>
+          <label className="flex items-center gap-1.5">
+            <input type="radio" checked={type === "house"} onChange={() => setType("house")} />
+            단독·다가구
+          </label>
+        </div>
         <form
-          className="flex gap-2"
+          className="flex flex-col gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             if (address.trim()) lookup({ address: address.trim() });
@@ -71,13 +92,33 @@ export default function LandPriceLookup({
           <input
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder="예: 서울특별시 중구 태평로1가 31"
-            aria-label="토지 지번 주소"
-            className="input flex-1 text-sm"
+            placeholder="지번 주소 예: 서울특별시 강남구 대치동 316"
+            aria-label="주택 지번 주소"
+            className="input text-sm"
           />
-          <button type="submit" disabled={loading || !address.trim()} className="btn-secondary disabled:opacity-40">
-            {loading ? "찾는 중…" : "찾기"}
-          </button>
+          <div className="flex gap-2">
+            {type === "apartment" && (
+              <>
+                <input
+                  value={dong}
+                  onChange={(e) => setDong(e.target.value)}
+                  placeholder="동 (예: 101, 없으면 비움)"
+                  aria-label="동"
+                  className="input min-w-0 flex-1 text-sm"
+                />
+                <input
+                  value={ho}
+                  onChange={(e) => setHo(e.target.value)}
+                  placeholder="호 (예: 503)"
+                  aria-label="호"
+                  className="input min-w-0 flex-1 text-sm"
+                />
+              </>
+            )}
+            <button type="submit" disabled={loading || !address.trim()} className="btn-secondary shrink-0 disabled:opacity-40">
+              {loading ? "찾는 중…" : "찾기"}
+            </button>
+          </div>
         </form>
 
         {error && (
@@ -116,19 +157,15 @@ export default function LandPriceLookup({
           <div className="flex flex-col gap-2 rounded-md bg-zinc-50 p-2 dark:bg-zinc-900">
             <p className="text-xs text-zinc-700 dark:text-zinc-200">
               <b>{result.address}</b>
-              {result.landCategory && ` (${result.landCategory})`}
+              {result.name && ` · ${result.name}`}
+              {result.area !== null && ` · ${result.area}㎡`}
             </p>
             <p className="text-xs tabular-nums text-zinc-600 dark:text-zinc-300">
-              ㎡당 {formatWon(result.pricePerSqm)} · {result.note}
+              공시가격 {formatWon(result.price)} · {result.note}
             </p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <MiniField label="면적 (㎡)">
-                <NumberInput value={area} onChange={setArea} placeholder={result.area === null ? "토지대장 면적 입력" : ""} />
-              </MiniField>
-              <MiniField label="회사 소유 지분 (%)">
-                <NumberInput value={share} onChange={setShare} placeholder="100" />
-              </MiniField>
-            </div>
+            <MiniField label="회사 소유 지분 (%)">
+              <NumberInput value={share} onChange={setShare} placeholder="100" />
+            </MiniField>
             <p className="text-sm font-medium tabular-nums text-zinc-900 dark:text-zinc-50">기준시가 {formatWon(total)}</p>
             <div className="flex flex-wrap gap-2">
               <button
@@ -151,10 +188,10 @@ export default function LandPriceLookup({
                 }}
                 className="btn-secondary disabled:opacity-40"
               >
-                기준시가에 더하기 (여러 필지)
+                기준시가에 더하기 (여러 채)
               </button>
             </div>
-            <p className="text-xs text-zinc-400">출처: 국토교통부 개별공시지가·토지대장 (브이월드)</p>
+            <p className="text-xs text-zinc-400">출처: 국토교통부 주택가격 공시 (브이월드)</p>
           </div>
         )}
         {done && <p className="text-xs text-emerald-700 dark:text-emerald-400">{done}</p>}

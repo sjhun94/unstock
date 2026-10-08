@@ -1,7 +1,7 @@
 // 실행: node --test lib/landPrice.test.ts  (응답 모양만 흉내 낸 가상의 데이터)
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { landStandardValue, parseLand, parsePrices, parseSearch, pickPrice } from "./landPrice.ts";
+import { landStandardValue, parseHousingPrices, parseLand, parsePrices, parseSearch, pickPrice } from "./landPrice.ts";
 
 test("주소 검색 응답에서 필지 고유번호와 지번 주소 읽기", () => {
   const json = {
@@ -47,6 +47,23 @@ test("평가기준일 현재 고시된 가장 최근 공시지가를 고름", ()
   // 공시일자를 모르면 5월 31일 고시로 봄
   assert.equal(pickPrice([{ year: 2024, pricePerSqm: 1, announcedDate: null }], "2024-05-30"), null);
   assert.equal(pickPrice([{ year: 2024, pricePerSqm: 1, announcedDate: null }], "2024-05-31")?.year, 2024);
+});
+
+test("주택가격 응답 읽기: 공동주택·개별주택, 같은 연도는 하나만", () => {
+  const apartment = parseHousingPrices({
+    apartHousingPrices: {
+      field: [
+        { stdrYear: "2024", pblntfPc: "500000000", aphusNm: "가상", dongNm: "1", hoNm: "101", prvuseAr: "59.9" },
+        { stdrYear: "2024", pblntfPc: "500000000", aphusNm: "가상", dongNm: "1", hoNm: "101", prvuseAr: "59.9" },
+      ],
+    },
+  });
+  assert.deepEqual(apartment, [{ year: 2024, price: 500_000_000, area: 59.9, name: "가상 1동 101호" }]);
+  const house = parseHousingPrices({ indvdHousingPrices: { field: [{ stdrYear: "2023", housePc: "300000000", buldAllTotAr: "120.5" }] } });
+  assert.deepEqual(house, [{ year: 2023, price: 300_000_000, area: 120.5, name: "" }]);
+  // 주택가격은 공시일자가 없어 4월 30일 공시로 봄
+  assert.equal(pickPrice([...house, { year: 2024, price: 1, area: null, name: "" }], "2024-04-29", "04-30")?.year, 2023);
+  assert.equal(pickPrice([...house, { year: 2024, price: 1, area: null, name: "" }], "2024-04-30", "04-30")?.year, 2024);
 });
 
 test("기준시가 = ㎡당 공시지가 × 면적 × 지분", () => {

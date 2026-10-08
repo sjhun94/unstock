@@ -23,8 +23,31 @@ export interface LandPriceResult {
   note: string;
 }
 
+// 주택 공시가격 (토지와 건물을 합친 가격)
+export type HousingType = "apartment" | "house"; // 공동주택(아파트·연립·다세대) / 개별주택(단독·다가구)
+
+export interface HousingPriceRecord {
+  year: number;
+  price: number; // 주택 공시가격 (원)
+  area: number | null; // 공동주택은 전용면적, 개별주택은 건물 연면적 ㎡
+  name: string; // 단지명·동·호
+}
+
+export interface HousingPriceResult {
+  pnu: string;
+  address: string;
+  type: HousingType;
+  year: number;
+  price: number;
+  announcedDate: string;
+  area: number | null;
+  name: string;
+  note: string;
+}
+
 export type LandPriceResponse =
   | { kind: "result"; result: LandPriceResult }
+  | { kind: "housing"; result: HousingPriceResult }
   | { kind: "candidates"; candidates: LandCandidate[] }
   | { kind: "error"; code: "not_configured" | "not_found" | "rate_limited" | "bad_request" | "upstream"; message: string };
 
@@ -84,11 +107,29 @@ export function parseLand(json: unknown): { area: number | null; landCategory: s
   return { area: toNumber(record.lndpclAr), landCategory: record.lndcgrCodeNm ? String(record.lndcgrCodeNm) : null };
 }
 
-// 평가기준일 현재 고시되어 있는 가장 최근 공시지가 (상증세법 제61조 제1항 제1호)
-// 공시일자를 모르면 그 해 5월 31일에 고시된 것으로 봄
-export function pickPrice(records: LandPriceRecord[], valuationDate: string): (LandPriceRecord & { announcedDate: string }) | null {
+// 주택가격 응답 → 연도별 가격 (같은 연도가 여러 번 오면 첫 번째)
+export function parseHousingPrices(json: unknown): HousingPriceRecord[] {
+  const rows = [...findRecords(json, "pblntfPc"), ...findRecords(json, "housePc")];
+  const byYear = new Map<number, HousingPriceRecord>();
+  for (const r of rows) {
+    const year = toNumber(r.stdrYear) ?? 0;
+    const price = toNumber(r.pblntfPc ?? r.housePc) ?? 0;
+    if (year <= 0 || price <= 0 || byYear.has(year)) continue;
+    const name = [r.aphusNm, r.dongNm ? `${r.dongNm}동` : "", r.hoNm ? `${r.hoNm}호` : ""].filter(Boolean).join(" ");
+    byYear.set(year, { year, price, area: toNumber(r.prvuseAr ?? r.buldAllTotAr), name });
+  }
+  return [...byYear.values()];
+}
+
+// 평가기준일 현재 고시되어 있는 가장 최근 가격 (상증세법 제61조 제1항)
+// 공시일자를 모르면 그 해 fallback(월-일)에 고시된 것으로 봄: 개별공시지가 5월 31일, 주택가격 4월 30일
+export function pickPrice<T extends { year: number; announcedDate?: string | null }>(
+  records: T[],
+  valuationDate: string,
+  fallback = "05-31",
+): (Omit<T, "announcedDate"> & { announcedDate: string }) | null {
   const usable = records
-    .map((r) => ({ ...r, announcedDate: r.announcedDate ?? `${r.year}-05-31` }))
+    .map((r) => ({ ...r, announcedDate: r.announcedDate ?? `${r.year}-${fallback}` }))
     .filter((r) => r.announcedDate <= valuationDate)
     .sort((a, b) => b.year - a.year);
   return usable[0] ?? null;
